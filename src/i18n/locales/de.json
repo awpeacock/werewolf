@@ -1,0 +1,16 @@
+{
+	"werewolf": "Werwolf",
+	"werewolf-game": "Werwolf-spiel",
+	"logo-alt": "Werwolf heult den Mond an",
+	"unexpected-error": "Etwas Unerwartetes ist schiefgelaufen. Bitte versuchen Sie es später noch einmal.",
+	"create-game": "Spiel erstellen",
+	"join-game": "Spiel beitreten",
+	"play-game": "Spiel spielen",
+	"resume-game": "Spiel fortsetzen",
+	"nickname": "Spitzname",
+	"create": "Erstellen",
+	"invite-players": "Spieler einladen",
+	"nickname-min": "Der Spitzname muss mindestens 5 Zeichen lang sein",
+	"nickname-max": "Der Spitzname darf nicht länger als 16 Zeichen sein.",
+	"nickname-invalid": "Der Spitzname darf nur alphanumerische Zeichen und Leerzeichen enthalten"
+}

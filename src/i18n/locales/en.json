@@ -1,0 +1,16 @@
+{
+	"werewolf": "Werewolf",
+	"werewolf-game": "Werewolf Game",
+	"logo-alt": "Werewolf howling at the moon",
+	"unexpected-error": "Something unexpected has gone wrong.  Please try again later.",
+	"create-game": "Create Game",
+	"join-game": "Join Game",
+	"play-game": "Play Game",
+	"resume-game": "Resume Game",
+	"nickname": "Nickname",
+	"create": "Create",
+	"invite-players": "Invite Players",
+	"nickname-min": "Nickname must be at least 5 characters long",
+	"nickname-max": "Nickname must be no more than 16 characters long",
+	"nickname-invalid": "Nickname can only contain alphanumerics and spaces"
+}
