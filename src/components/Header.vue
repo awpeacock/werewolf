@@ -8,7 +8,7 @@ const locales: Array<string> = useI18n().localeCodes.value;
 const styles = {
 	header: {
 		home: 'flex-col',
-		default: 'flex-row md:flex-col md:items-center',
+		default: 'flex-row sm:max-md:mr-[120px] sm:max-md:px-4 md:flex-col md:items-center',
 	},
 	image: {
 		home: 'm-auto cursor-default',

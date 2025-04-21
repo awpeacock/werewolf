@@ -7,6 +7,9 @@ const props = defineProps<{
 defineOptions({
 	inheritAttrs: false,
 });
+const emit = defineEmits<{
+	(_e: 'click', _event: MouseEvent): void;
+}>();
 
 const localePath = useLocalePath();
 </script>
@@ -18,7 +21,14 @@ const localePath = useLocalePath();
 			class="border-2 border-yellow-200 rounded-2xl mb-4 p-4 bg-yellow-600 text-yellow-100 font-oswald text-xl cursor-pointer"
 			:class="props.class"
 			v-bind="$attrs"
-			@click="navigate"
+			@click="
+				(event) => {
+					emit('click', event);
+					if (!event.defaultPrevented) {
+						navigate();
+					}
+				}
+			"
 		>
 			{{ $t(label) }}
 		</button>

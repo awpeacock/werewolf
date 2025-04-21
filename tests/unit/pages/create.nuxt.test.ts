@@ -10,6 +10,7 @@ import { UnexpectedErrorResponse } from '@/types/constants';
 import { waitFor } from '@tests/unit/setup/global';
 import { server, spyApi } from '@tests/unit/setup/api';
 import { mockT, setLocale } from '@tests/unit/setup/i18n';
+import { mockNavigate, stubNuxtLink } from '@tests/unit/setup/navigation';
 import { stubInactiveGame, stubNicknameError } from '@tests/unit/setup/stubs';
 
 interface UnsafeCreateStatus {
@@ -165,6 +166,52 @@ describe('Create Game page', () => {
 			const wrapper = await setupPage(locale);
 			expect(sessionStorage.getItem('create')).toContain(JSON.stringify(stubStatus));
 			expectStage2(wrapper, locale, stubInactiveGame.id);
+		}
+	);
+
+	it.each(['en', 'de'])('uses the Web Share API to send a link', async (locale: string) => {
+		sessionStorage.setItem('create', JSON.stringify(stubStatus));
+		const wrapper = await setupPage(locale);
+		expectStage2(wrapper, locale, stubInactiveGame.id);
+
+		const mockShare = vi.fn();
+		navigator.share = mockShare;
+		navigator.canShare = vi.fn().mockReturnValue(true);
+
+		const button = wrapper.find('button[data-test="invite-button"]');
+		await button.trigger('click');
+		await flushPromises();
+
+		expect(mockShare).toBeCalled();
+	});
+
+	it.each(['en', 'de'])(
+		'routes to the invite page if Web Share API not available',
+		async (locale: string) => {
+			setLocale(locale);
+			sessionStorage.setItem('create', JSON.stringify(stubStatus));
+			const wrapper = await mountSuspended(page, {
+				global: {
+					mocks: {
+						$t: mockT,
+					},
+					stubs: {
+						NuxtLink: stubNuxtLink,
+					},
+				},
+			});
+			expectStage2(wrapper, locale, stubInactiveGame.id);
+
+			const mockShare = vi.fn().mockReturnValue(false);
+			navigator.share = mockShare;
+			navigator.canShare = vi.fn().mockReturnValue(false);
+
+			const button = wrapper.find('button[data-test="invite-button"]');
+			await button.trigger('click');
+			await flushPromises();
+
+			expect(mockShare).not.toBeCalled();
+			expect(mockNavigate).toHaveBeenCalled();
 		}
 	);
 

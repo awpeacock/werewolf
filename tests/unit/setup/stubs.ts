@@ -1,7 +1,14 @@
+import { Role } from '@/types/enums';
+
 export const stubMayor: Player = {
 	id: 'a1b2a483-79ec-4790-a440-73415f223de1',
 	nickname: 'TestPlayer',
-	role: 'Mayor',
+	role: Role.MAYOR,
+};
+export const stubVillager: Player = {
+	id: '',
+	nickname: 'Another Player',
+	role: Role.VILLAGER,
 };
 
 export const stubInactiveGame: Game = {

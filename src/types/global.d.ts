@@ -1,8 +1,15 @@
 declare type Nullable<T> = T | null;
 
+declare type Undefinable<T> = T | undefined;
+
 interface DynamoDBWrapper {
 	put: (game: Game) => Promise<void>;
 	get: (id: string) => Promise<Nullable<Game>>;
+}
+
+interface FooterMeta {
+	src: string;
+	alt: string;
 }
 
 interface APIError {

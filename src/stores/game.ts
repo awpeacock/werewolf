@@ -1,3 +1,4 @@
+import { Role } from '@/types/enums';
 import { defineStore } from 'pinia';
 
 let config: boolean | object = false;
@@ -21,8 +22,24 @@ export const useGameStore = defineStore('game', {
 		},
 	},
 	getters: {
-		url(game: Game): string {
-			return '/play/' + game.id;
+		invite(): string {
+			const path = `/join/${this.id}`;
+			if (this.mayor) {
+				return `${path}?invite=${this.mayor.id}`;
+			} else {
+				return path;
+			}
+		},
+		url(): string {
+			return '/play/' + this.id;
+		},
+		mayor(): Nullable<Player> {
+			for (const player of this.players) {
+				if (player.role == Role.MAYOR) {
+					return player;
+				}
+			}
+			return null;
 		},
 	},
 	persist: config,

@@ -16,7 +16,14 @@ interface CreateStatus {
 
 definePageMeta({
 	title: 'create-game',
+	footer: {
+		src: '/images/village/carpenter.webp',
+		alt: 'carpenter-alt-text',
+	},
 });
+
+const { t } = useI18n();
+const localePath = useLocalePath();
 
 const status: Ref<CreateStatus> = ref({ stage: 1, code: '' });
 const game = useGameStore();
@@ -61,6 +68,7 @@ const create = async (): Promise<void> => {
 				status.value.stage++;
 				sessionStorage.setItem('create', JSON.stringify(status.value));
 				game.set(parseGame(response));
+				sessionStorage.setItem('player', JSON.stringify(game.mayor));
 			})
 			.catch((e) => {
 				loading.value = false;
@@ -73,6 +81,19 @@ const create = async (): Promise<void> => {
 			});
 	}
 };
+
+const invite = async (event: MouseEvent) => {
+	const url = new URL(localePath(game.invite), useRequestURL()).toString();
+	const content: ShareData = {
+		title: t('invite-subject'),
+		text: t('invite-message', { inviter: game.players[0].nickname }),
+		url: url,
+	};
+	if (navigator.share && navigator.canShare(content)) {
+		event?.preventDefault();
+		await navigator.share(content);
+	}
+};
 </script>
 
 <template>
@@ -82,7 +103,7 @@ const create = async (): Promise<void> => {
 		<div v-if="status!.stage == 1">
 			<Nickname ref="input" v-model="nickname" :server-error="validationError" />
 			<Button
-				link="create"
+				link="/create"
 				label="create"
 				class="w-full"
 				data-test="create-button"
@@ -91,7 +112,13 @@ const create = async (): Promise<void> => {
 		</div>
 		<div v-else>
 			<Code :chars="status!.code" />
-			<Button link="invite" label="invite-players" class="w-full" />
+			<Button
+				link="/create/invite"
+				label="invite-players"
+				data-test="invite-button"
+				class="w-full"
+				@click="invite"
+			/>
 			<Button :link="game.url" label="play-game" class="w-full" />
 		</div>
 	</div>
