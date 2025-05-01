@@ -1,6 +1,11 @@
 import type { H3Event, EventHandlerRequest } from 'h3';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
+import {
+	DynamoDBDocumentClient,
+	GetCommand,
+	PutCommand,
+	UpdateCommand,
+} from '@aws-sdk/lib-dynamodb';
 
 export default defineNitroPlugin((nitro) => {
 	const config = useRuntimeConfig();
@@ -34,6 +39,27 @@ export default defineNitroPlugin((nitro) => {
 				throw e;
 			}
 		},
+		// Update a game on the database
+		update: async (game: Game): Promise<void> => {
+			try {
+				const update = new UpdateCommand({
+					TableName: config.AWS_DYNAMODB_TABLE,
+					Key: {
+						Id: game.id,
+					},
+					UpdateExpression: 'SET Players = :players, Pending = :pending',
+					ExpressionAttributeValues: {
+						':players': game.players,
+						':pending': game.pending,
+					},
+					ReturnValues: 'ALL_NEW',
+				});
+				await docClient.send(update);
+			} catch (e) {
+				console.error(`Unable to update game: ${(e as Error).message}`);
+				throw e;
+			}
+		},
 		// Retrieve a game from the database
 		get: async (id: string): Promise<Nullable<Game>> => {
 			try {
@@ -51,6 +77,7 @@ export default defineNitroPlugin((nitro) => {
 						created: new Date(response.Item.Created),
 						active: response.Item.Active,
 						players: response.Item.Players,
+						pending: response.Item.Pending,
 					};
 					return game;
 				}

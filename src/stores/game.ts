@@ -1,5 +1,6 @@
-import { Role } from '@/types/enums';
 import { defineStore } from 'pinia';
+
+import { useGame } from '@/composables/useGame';
 
 let config: boolean | object = false;
 if (useEnvironment().isClient()) {
@@ -15,10 +16,20 @@ export const useGameStore = defineStore('game', {
 		created: new Date(),
 		active: false,
 		players: [],
+		pending: [],
 	}),
 	actions: {
 		set(game: Game) {
 			this.$patch(game);
+		},
+		findPlayer(nickname: string): Nullable<Player> {
+			return useGame(this).findPlayer(nickname);
+		},
+		hasPlayer(nickname: string): boolean {
+			return useGame(this).hasPlayer(nickname);
+		},
+		isPlayerAdmitted(nickname: string): boolean {
+			return useGame(this).isPlayerAdmitted(nickname);
 		},
 	},
 	getters: {
@@ -34,12 +45,7 @@ export const useGameStore = defineStore('game', {
 			return '/play/' + this.id;
 		},
 		mayor(): Nullable<Player> {
-			for (const player of this.players) {
-				if (player.role == Role.MAYOR) {
-					return player;
-				}
-			}
-			return null;
+			return useGame(this).mayor();
 		},
 	},
 	persist: config,

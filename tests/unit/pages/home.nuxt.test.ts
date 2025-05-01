@@ -6,7 +6,7 @@ import page from '@/pages/index.vue';
 import { useGameStore } from '@/stores/game';
 
 import { mockT, setLocale } from '@tests/unit/setup/i18n';
-import { stubActiveGame } from '@tests/unit/setup/stubs';
+import { stubGameActive } from '@tests/unit/setup/stubs';
 
 describe('Home page', () => {
 	const store = useGameStore();
@@ -31,7 +31,7 @@ describe('Home page', () => {
 		expect(links[0]!.props('to')).toEqual({ path: '/create' });
 		expect(links[1]!.props('to')).toEqual({ path: '/join' });
 		if (all) {
-			expect(links[2]!.props('to')).toEqual({ path: `/play/${stubActiveGame.id}` });
+			expect(links[2]!.props('to')).toEqual({ path: `/play/${stubGameActive.id}` });
 		}
 	};
 
@@ -60,7 +60,7 @@ describe('Home page', () => {
 	it.each(['en', 'de'])('renders with an active game in session', async (locale: string) => {
 		setLocale(locale);
 
-		store.$state = stubActiveGame;
+		store.$state = stubGameActive;
 
 		const wrapper = await mountSuspended(page, {
 			global: {

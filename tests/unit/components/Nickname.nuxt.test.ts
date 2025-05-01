@@ -25,19 +25,20 @@ describe('Nickname', async () => {
 					$t: mockT,
 				},
 			},
+			attachTo: document.body,
 		});
 	};
 
 	const expectDefaultLayout = (input: DOMWrapper<HTMLInputElement>) => {
 		expect(input).not.toBeNull();
 		expect(input.classes('border-yellow-200')).toBeTruthy();
-		expect(wrapper.find('.bg-red-600').exists()).not.toBeTruthy();
+		expect(wrapper.find('.bg-red-600').exists()).toBeFalsy();
 	};
 
 	const expectSuccessLayout = (input: DOMWrapper<HTMLInputElement>) => {
 		expect(input).not.toBeNull();
 		expect(input.classes('border-green-600')).toBeTruthy();
-		expect(wrapper.find('.bg-red-600').exists()).not.toBeTruthy();
+		expect(wrapper.find('.bg-red-600').exists()).toBeFalsy();
 		expect(wrapper.emitted('update:modelValue')).toBeTruthy();
 	};
 
@@ -67,6 +68,7 @@ describe('Nickname', async () => {
 		const input = wrapper.find('input');
 		expectDefaultLayout(input);
 		expect(input.element.value).toBe('');
+		wrapper.unmount();
 	});
 
 	it('should validate successfully when a valid name is entered', async () => {
@@ -74,10 +76,12 @@ describe('Nickname', async () => {
 
 		const input = wrapper.find('input');
 		await input.setValue('TestPlayer');
-		await input.trigger('blur');
+		wrapper.vm.validate();
+		await nextTick();
 
 		expectSuccessLayout(input);
 		expect(wrapper.props('modelValue')).toEqual('TestPlayer');
+		wrapper.unmount();
 	});
 
 	it.each(['en', 'de'])(
@@ -88,9 +92,11 @@ describe('Nickname', async () => {
 
 			const input = wrapper.find('input');
 			await input.setValue('Test');
-			await input.trigger('blur');
+			wrapper.vm.validate();
+			await nextTick();
 
 			expectInvalidLayout(input, 'Test', `nickname-min (${locale})`);
+			wrapper.unmount();
 		}
 	);
 
@@ -102,9 +108,11 @@ describe('Nickname', async () => {
 
 			const input = wrapper.find('input');
 			await input.setValue('Overly Long Test Nickname');
-			await input.trigger('blur');
+			wrapper.vm.validate();
+			await nextTick();
 
 			expectInvalidLayout(input, 'Overly Long Test Nickname', `nickname-max (${locale})`);
+			wrapper.unmount();
 		}
 	);
 
@@ -125,10 +133,12 @@ describe('Nickname', async () => {
 			for (const name of names) {
 				const input = wrapper.find('input');
 				await input.setValue(name);
-				await input.trigger('blur');
+				wrapper.vm.validate();
+				await nextTick();
 
 				expectInvalidLayout(input, name, `nickname-invalid (${locale})`);
 			}
+			wrapper.unmount();
 		}
 	);
 
@@ -140,12 +150,14 @@ describe('Nickname', async () => {
 
 			const input = wrapper.find('input');
 			await input.setValue('ServerSide');
-			await input.trigger('blur');
+			wrapper.vm.validate();
+			await nextTick();
 
-			wrapper.setProps({ serverError: 'nickname-invalid' });
+			wrapper.setProps({ error: 'nickname-invalid' });
 			await nextTick();
 
 			expectInvalidLayout(input, 'ServerSide', `nickname-invalid (${locale})`, true);
+			wrapper.unmount();
 		}
 	);
 
@@ -155,26 +167,30 @@ describe('Nickname', async () => {
 
 		const input = wrapper.find('input');
 		await input.setValue('TestPlayer');
-		await input.trigger('blur');
+		wrapper.vm.validate();
+		await nextTick();
 		expectSuccessLayout(input);
 
 		await input.trigger('focus');
 		expectDefaultLayout(input);
 
 		await input.setValue('More Than 16 Characters');
-		await input.trigger('blur');
+		wrapper.vm.validate();
+		await nextTick();
 		expectInvalidLayout(input, 'More Than 16 Characters', `nickname-max (${locale})`);
 
 		await input.trigger('focus');
 		expectDefaultLayout(input);
 
-		wrapper.setProps({ serverError: 'nickname-invalid' });
+		wrapper.setProps({ error: 'nickname-invalid' });
 		await nextTick();
 		expectInvalidLayout(input, 'More Than 16 Characters', `nickname-invalid (${locale})`, true);
 
-		wrapper.setProps({ serverError: null });
-		await input.trigger('focus');
+		// And also try focus being called externally
+		wrapper.setProps({ error: null });
+		wrapper.vm.focus();
 		await nextTick();
 		expectDefaultLayout(input);
+		wrapper.unmount();
 	});
 });

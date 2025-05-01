@@ -7,7 +7,17 @@ import {
 	type DynamoDBServiceException,
 } from '@aws-sdk/client-dynamodb';
 
-import { stubInactiveGame } from './stubs';
+import {
+	stubGameIdDuplicateError,
+	stubGameIdGetError,
+	stubGameIdNotFound,
+	stubGameIdPutError,
+	stubGameIdUpdateError,
+	stubGameInactive,
+	stubGameNew,
+	stubGamePending,
+	stubGameUpdateFailure,
+} from '@tests/unit/setup/stubs';
 
 vi.mock('@aws-sdk/client-dynamodb', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('@aws-sdk/client-dynamodb')>();
@@ -30,6 +40,12 @@ vi.mock('@aws-sdk/client-dynamodb', async (importOriginal) => {
 export const mockDynamoPut = vi.fn().mockImplementation(function (this: { input: unknown }, input) {
 	this.input = input;
 });
+export const mockDynamoUpdate = vi.fn().mockImplementation(function (
+	this: { input: unknown },
+	input
+) {
+	this.input = input;
+});
 export const mockDynamoGet = vi.fn().mockImplementation(function (this: { input: unknown }, input) {
 	this.input = input;
 });
@@ -39,10 +55,10 @@ vi.mock('@aws-sdk/lib-dynamodb', () => {
 			from: vi.fn().mockReturnValue({
 				send: vi.fn((command) => {
 					if (command instanceof mockDynamoPut) {
-						if (command.input?.Item?.Id === 'FAIL') {
+						if (command.input?.Item?.Id === stubGameIdPutError) {
 							return Promise.reject(new Error('Simulated "put" failure'));
 						}
-						if (command.input?.Item?.Id === 'DUPE') {
+						if (command.input?.Item?.Id === stubGameIdDuplicateError) {
 							return Promise.reject(
 								new ConditionalCheckFailedException({
 									message: 'Simulated "put" failure',
@@ -52,19 +68,45 @@ vi.mock('@aws-sdk/lib-dynamodb', () => {
 						}
 						return Promise.resolve({});
 					}
+					if (command instanceof mockDynamoUpdate) {
+						if (command.input?.Key?.Id === stubGameIdUpdateError) {
+							return Promise.reject(new Error('Simulated "update" failure'));
+						}
+						return Promise.resolve({});
+					}
 					if (command instanceof mockDynamoGet) {
-						if (command.input?.Key?.Id === 'EMPTY') {
+						if (command.input?.Key?.Id === stubGameIdNotFound) {
 							return Promise.resolve({ Item: undefined });
 						}
-						if (command.input?.Key?.Id === 'FAIL') {
+						if (command.input?.Key?.Id === stubGameIdGetError) {
 							return Promise.reject(new Error('Simulated "get" failure'));
+						}
+						let response: Game;
+						switch (command.input?.Key?.Id) {
+							case stubGameInactive.id: {
+								response = stubGameInactive;
+								break;
+							}
+							case stubGamePending.id: {
+								response = stubGamePending;
+								break;
+							}
+							case stubGameUpdateFailure.id: {
+								response = stubGameUpdateFailure;
+								break;
+							}
+							default: {
+								response = stubGameNew;
+								break;
+							}
 						}
 						return Promise.resolve({
 							Item: {
-								Id: stubInactiveGame.id,
-								Created: stubInactiveGame.created,
-								Active: stubInactiveGame.active,
-								Players: stubInactiveGame.players,
+								Id: structuredClone(response.id),
+								Created: structuredClone(response.created),
+								Active: structuredClone(response.active),
+								Players: structuredClone(response.players),
+								Pending: structuredClone(response.pending),
 							},
 						});
 					}
@@ -72,11 +114,15 @@ vi.mock('@aws-sdk/lib-dynamodb', () => {
 			}),
 		},
 		GetCommand: mockDynamoGet,
+		UpdateCommand: mockDynamoUpdate,
 		PutCommand: mockDynamoPut,
 	};
 });
 export const stubDynamoWrapper: DynamoDBWrapper = {
 	put: (_game: Game) => {
+		return Promise.resolve();
+	},
+	update: (_game: Game) => {
 		return Promise.resolve();
 	},
 	get: (_id: string) => {

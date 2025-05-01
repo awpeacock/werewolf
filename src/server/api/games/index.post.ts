@@ -2,6 +2,7 @@ import type { H3Event, EventHandlerRequest } from 'h3';
 import { v4 as uuidv4 } from 'uuid';
 
 import { useDynamoDB } from '@/composables/useDynamoDB';
+import { useValidation } from '@/composables/useValidation';
 import { Role } from '@/types/enums';
 import { NoUniqueIdErrorResponse, UnexpectedErrorResponse } from '@/types/constants';
 
@@ -14,7 +15,7 @@ export default defineEventHandler(
 		const body: CreateRequest = await readBody(event);
 
 		// Never trust only on client-side validation - let's do it all again
-		const errors: Array<APIError> = validateNickname(body.mayor);
+		const errors: Array<APIError> = useValidation().validateNickname(body.mayor);
 		if (errors.length > 0) {
 			const response: APIErrorResponse = { errors: errors };
 			setResponseStatus(event, 400);
@@ -38,6 +39,7 @@ export default defineEventHandler(
 			try {
 				const dynamo: DynamoDBWrapper = useDynamoDB(event);
 				await dynamo.put(game);
+				setResponseStatus(event, 200);
 				return game;
 			} catch (e: unknown) {
 				if ((e as Error).name !== 'ConditionalCheckFailedException') {

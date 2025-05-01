@@ -1,26 +1,17 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { mockNuxtImport } from '@nuxt/test-utils/runtime';
+import { beforeEach, describe, expect, it, vi, beforeAll } from 'vitest';
 
 import { NoUniqueIdErrorResponse, UnexpectedErrorResponse } from '@/types/constants';
 
+import { mockResponseStatus } from '@tests/unit/setup/api';
 import { setupDynamoWrapperForEvent } from '@tests/unit/setup/dynamodb';
-import { stubInactiveGame, stubMayor, stubNicknameError } from '@tests/unit/setup/stubs';
-
-let mockRetries: Nullable<number> = 5;
-mockNuxtImport('useRuntimeConfig', () => {
-	return () => {
-		return {
-			AWS_REGION: 'AWS_REGION',
-			AWS_ACCESS_KEY_ID: 'AWS_ACCESS_KEY_ID',
-			AWS_SECRET_ACCESS_KEY: 'AWS_SECRET_ACCESS_KEY',
-			AWS_DYNAMODB_TABLE: 'AWS_DYNAMODB_TABLE',
-			CREATE_MAX_RETRIES: mockRetries,
-		};
-	};
-});
-
-vi.stubGlobal('defineNitroPlugin', (plugin: unknown) => plugin);
-vi.stubGlobal('defineEventHandler', (func: unknown) => func);
+import { setMockRetries, setupRuntimeConfigForApis } from '@tests/unit/setup/runtime';
+import {
+	stubGameNew,
+	stubMayor,
+	stubErrorNickname,
+	stubGameIdDuplicateError,
+	stubGameIdPutError,
+} from '@tests/unit/setup/stubs';
 
 describe('Games API (POST)', async () => {
 	// This is to catch the DynamoDB initialisation message
@@ -29,6 +20,10 @@ describe('Games API (POST)', async () => {
 	// we mock UUID so that the mock is fired rather than the real method
 	const event = await setupDynamoWrapperForEvent();
 	expect(spyLog).toBeCalled();
+
+	beforeAll(() => {
+		setupRuntimeConfigForApis();
+	});
 
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -47,11 +42,12 @@ describe('Games API (POST)', async () => {
 		expect(response).not.toBeNull();
 		expect(response).toEqual(
 			expect.objectContaining({
-				id: stubInactiveGame.id,
+				id: stubGameNew.id,
 				active: false,
-				players: stubInactiveGame.players,
+				players: stubGameNew.players,
 			})
 		);
+		expect(mockResponseStatus).toBeCalledWith(event, 200);
 	});
 
 	it('should return an ErrorResponse (with validation messages) if the values are invalid', async () => {
@@ -62,19 +58,20 @@ describe('Games API (POST)', async () => {
 		for (let n = 0; n < names.length; n++) {
 			vi.stubGlobal('readBody', vi.fn().mockResolvedValue({ mayor: names[n] }));
 
-			const error = stubNicknameError;
+			const error = stubErrorNickname;
 			error.errors[0].message = errors[n];
 			const response = await handler.default(event);
 
 			expect(response).not.toBeNull();
 			expect(response).toEqual(error);
+			expect(mockResponseStatus).toBeCalledWith(event, 400);
 		}
 	});
 
 	it('should return an ErrorResponse (with unexpected error) if DynamoDB fails', async () => {
 		vi.stubGlobal('readBody', vi.fn().mockResolvedValue({ mayor: 'Mayoral Name' }));
 		vi.doMock('uuid', () => ({
-			v4: vi.fn().mockReturnValueOnce('FAIL'),
+			v4: vi.fn().mockReturnValueOnce(stubGameIdPutError),
 		}));
 		const spyError = vi.spyOn(console, 'error').mockImplementation(() => null);
 
@@ -83,25 +80,27 @@ describe('Games API (POST)', async () => {
 
 		expect(response).not.toBeNull();
 		expect(response).toEqual(UnexpectedErrorResponse);
+		expect(mockResponseStatus).toBeCalledWith(event, 500);
 		expect(spyError).toBeCalled();
 	});
 
 	it('should return an ErrorResponse (with unexpected error) if it hits the max retry limit', async () => {
 		vi.stubGlobal('readBody', vi.fn().mockResolvedValue({ mayor: 'Mayoral Name' }));
 		vi.doMock('uuid', () => ({
-			v4: vi.fn().mockReturnValue('DUPE'),
+			v4: vi.fn().mockReturnValue(stubGameIdDuplicateError),
 		}));
 		const spyError = vi.spyOn(console, 'error').mockImplementation(() => null);
 
 		const retries: Array<Nullable<number>> = [null, 5];
 		for (const r of retries) {
-			mockRetries = r;
+			setMockRetries(r);
 
 			const handler = await import('@/server/api/games/index.post');
 			const response = await handler.default(event);
 
 			expect(response).not.toBeNull();
 			expect(response).toEqual(NoUniqueIdErrorResponse);
+			expect(mockResponseStatus).toBeCalledWith(event, 500);
 			expect(spyError).toBeCalled();
 		}
 	});

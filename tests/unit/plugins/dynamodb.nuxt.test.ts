@@ -1,9 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import type { NitroApp } from 'nitropack';
 import type { H3Event, EventHandlerRequest } from 'h3';
 
-import { mockDynamoGet, mockDynamoPut } from '@tests/unit/setup/dynamodb';
-import { stubFailureGame, stubInactiveGame } from '@tests/unit/setup/stubs';
+import { mockDynamoGet, mockDynamoPut, mockDynamoUpdate } from '@tests/unit/setup/dynamodb';
+import {
+	stubGameIdGetError,
+	stubGameIdNotFound,
+	stubGameInactive,
+	stubGameNew,
+	stubGamePending,
+	stubGamePutFailure,
+	stubGameUpdateFailure,
+} from '@tests/unit/setup/stubs';
 
 vi.stubGlobal('defineNitroPlugin', (plugin: unknown) => plugin);
 
@@ -42,8 +51,10 @@ describe('DynamoDB Nitro Plugin', async () => {
 
 		expect(dynamo).toBeDefined();
 		expect(dynamo).toHaveProperty('put');
+		expect(dynamo).toHaveProperty('update');
 		expect(dynamo).toHaveProperty('get');
 		expect(typeof dynamo.get).toBe('function');
+		expect(typeof dynamo.update).toBe('function');
 		expect(typeof dynamo.put).toBe('function');
 		expect(spyLog).toBeCalled();
 	});
@@ -52,18 +63,37 @@ describe('DynamoDB Nitro Plugin', async () => {
 		const dynamo: DynamoDBWrapper = event.context.dynamo;
 
 		expect(async () => {
-			await dynamo.put(stubInactiveGame);
+			await dynamo.put(stubGameNew);
 			expect(mockDynamoPut).toHaveBeenCalled();
 			expect(mockDynamoPut).toHaveBeenCalledWith(
 				expect.objectContaining({
 					TableName: expect.any(String),
 					Item: expect.objectContaining({
-						Id: stubInactiveGame.id,
+						Id: stubGameNew.id,
 					}),
 				})
 			);
 			const args = mockDynamoPut.mock.calls[0][0];
-			expect(args.Item.Id).toBe(stubInactiveGame.id);
+			expect(args.Item.Id).toBe(stubGameNew.id);
+		}).not.toThrow();
+	});
+
+	it('should generate a DynamoDB wrapper to update the database', async () => {
+		const dynamo: DynamoDBWrapper = event.context.dynamo;
+
+		expect(async () => {
+			await dynamo.update(stubGameInactive);
+			expect(mockDynamoUpdate).toHaveBeenCalled();
+			expect(mockDynamoUpdate).toHaveBeenCalledWith(
+				expect.objectContaining({
+					TableName: expect.any(String),
+					ExpressionAttributeValues: expect.objectContaining({
+						':players': stubGameInactive.players,
+					}),
+				})
+			);
+			const args = mockDynamoUpdate.mock.calls[0][0];
+			expect(args.Key.Id).toBe(stubGameInactive.id);
 		}).not.toThrow();
 	});
 
@@ -71,21 +101,24 @@ describe('DynamoDB Nitro Plugin', async () => {
 		const dynamo: DynamoDBWrapper = event.context.dynamo;
 
 		expect(async () => {
-			const game: Game = (await dynamo.get(stubInactiveGame.id)) as Game;
+			const game: Game = (await dynamo.get(stubGameNew.id)) as Game;
 			expect(mockDynamoGet).toHaveBeenCalled();
 			expect(mockDynamoGet).toHaveBeenCalledWith(
 				expect.objectContaining({
 					TableName: expect.any(String),
-					Key: { Id: stubInactiveGame.id },
+					Key: { Id: stubGameNew.id },
 				})
 			);
 			const args = mockDynamoGet.mock.calls[0][0];
-			expect(args.Key.Id).toBe(stubInactiveGame.id);
+			expect(args.Key.Id).toBe(stubGameNew.id);
 
-			expect(game.active).not.toBeTruthy();
-			expect(game.players).toEqual(stubInactiveGame.players);
+			expect(game.active).toBeFalsy();
+			expect(game.players).toEqual(stubGameNew.players);
 
-			const nothing = await dynamo.get('EMPTY');
+			const pending = await dynamo.get(stubGamePending.id);
+			expect(pending!.pending).toEqual(stubGamePending.pending);
+
+			const nothing = await dynamo.get(stubGameIdNotFound);
 			expect(nothing).toBeNull();
 		}).not.toThrow();
 	});
@@ -95,10 +128,13 @@ describe('DynamoDB Nitro Plugin', async () => {
 
 		const log = vi.spyOn(console, 'error').mockImplementation(() => null);
 
-		await expect(dynamo.put(stubFailureGame)).rejects.toThrow();
+		await expect(dynamo.put(stubGamePutFailure)).rejects.toThrow();
 		expect(log).toHaveBeenLastCalledWith('Unable to save game: Simulated "put" failure');
 
-		await expect(dynamo.get(stubFailureGame.id)).rejects.toThrow();
+		await expect(dynamo.update(stubGameUpdateFailure)).rejects.toThrow();
+		expect(log).toHaveBeenLastCalledWith('Unable to update game: Simulated "update" failure');
+
+		await expect(dynamo.get(stubGameIdGetError)).rejects.toThrow();
 		expect(log).toHaveBeenLastCalledWith('Unable to retrieve game: Simulated "get" failure');
 	});
 });

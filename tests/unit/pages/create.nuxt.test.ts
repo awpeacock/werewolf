@@ -11,7 +11,7 @@ import { waitFor } from '@tests/unit/setup/global';
 import { server, spyApi } from '@tests/unit/setup/api';
 import { mockT, setLocale } from '@tests/unit/setup/i18n';
 import { mockNavigate, stubNuxtLink } from '@tests/unit/setup/navigation';
-import { stubInactiveGame, stubNicknameError } from '@tests/unit/setup/stubs';
+import { stubGameNew, stubErrorNickname } from '@tests/unit/setup/stubs';
 
 interface UnsafeCreateStatus {
 	stage: number;
@@ -21,12 +21,13 @@ interface UnsafeCreateStatus {
 describe('Create Game page', () => {
 	const stubStatus: UnsafeCreateStatus = {
 		stage: 2,
-		code: stubInactiveGame.id,
+		code: stubGameNew.id,
 	};
 
 	const store = useGameStore();
-	vi.spyOn(store, 'set').mockImplementation(() => {});
-	store.$state = stubInactiveGame;
+	vi.spyOn(store, 'set').mockImplementation((game: Game) => {
+		store.$state = game;
+	});
 
 	const url = '/api/games';
 
@@ -77,11 +78,11 @@ describe('Create Game page', () => {
 			expect(spyApi).not.toHaveBeenCalled();
 		}
 		if (expected) {
-			expect(useGameStore().set).toHaveBeenCalledWith(stubInactiveGame);
+			expect(useGameStore().set).toHaveBeenCalledWith(stubGameNew);
 			expect(sessionStorage.getItem('create')).not.toBeNull();
 
 			const game: Game = useGameStore().$state;
-			expect(game).toEqual(stubInactiveGame);
+			expect(game).toEqual(expect.objectContaining(stubGameNew));
 		} else {
 			expect(useGameStore().set).not.toHaveBeenCalled();
 			expect(sessionStorage.getItem('create')).toBeNull();
@@ -136,21 +137,21 @@ describe('Create Game page', () => {
 	});
 
 	it.each(['en', 'de'])('submits the form successfully', async (locale: string) => {
-		const wrapper = await setupPage(locale, 200, stubInactiveGame);
-		await triggerInput(wrapper, 'TestPlayer', true, stubInactiveGame);
-		expectStage2(wrapper, locale, stubInactiveGame.id);
+		const wrapper = await setupPage(locale, 200, stubGameNew);
+		await triggerInput(wrapper, 'TestPlayer', true, stubGameNew);
+		expectStage2(wrapper, locale, stubGameNew.id);
 	});
 
 	it.each(['en', 'de'])('will invalidate the form appropriately', async (locale: string) => {
-		const wrapper = await setupPage(locale, 400, stubNicknameError);
+		const wrapper = await setupPage(locale, 400, stubErrorNickname);
 		await triggerInput(wrapper, 'Jim', false);
-		expectStage1(wrapper, locale, stubNicknameError.errors[0].message, false);
+		expectStage1(wrapper, locale, stubErrorNickname.errors[0].message, false);
 	});
 
 	it.each(['en', 'de'])('handles API validation failures', async (locale: string) => {
-		const wrapper = await setupPage(locale, 400, stubNicknameError);
+		const wrapper = await setupPage(locale, 400, stubErrorNickname);
 		await triggerInput(wrapper, 'TestPlayer', true);
-		expectStage1(wrapper, locale, stubNicknameError.errors[0].message, false);
+		expectStage1(wrapper, locale, stubErrorNickname.errors[0].message, false);
 	});
 
 	it.each(['en', 'de'])('handles API errors', async (locale: string) => {
@@ -165,55 +166,31 @@ describe('Create Game page', () => {
 			sessionStorage.setItem('create', JSON.stringify(stubStatus));
 			const wrapper = await setupPage(locale);
 			expect(sessionStorage.getItem('create')).toContain(JSON.stringify(stubStatus));
-			expectStage2(wrapper, locale, stubInactiveGame.id);
+			expectStage2(wrapper, locale, stubGameNew.id);
 		}
 	);
 
-	it.each(['en', 'de'])('uses the Web Share API to send a link', async (locale: string) => {
+	it.each(['en', 'de'])('routes to the invite page', async (locale: string) => {
+		setLocale(locale);
 		sessionStorage.setItem('create', JSON.stringify(stubStatus));
-		const wrapper = await setupPage(locale);
-		expectStage2(wrapper, locale, stubInactiveGame.id);
-
-		const mockShare = vi.fn();
-		navigator.share = mockShare;
-		navigator.canShare = vi.fn().mockReturnValue(true);
+		const wrapper = await mountSuspended(page, {
+			global: {
+				mocks: {
+					$t: mockT,
+				},
+				stubs: {
+					NuxtLink: stubNuxtLink,
+				},
+			},
+		});
+		expectStage2(wrapper, locale, stubGameNew.id);
 
 		const button = wrapper.find('button[data-test="invite-button"]');
 		await button.trigger('click');
 		await flushPromises();
 
-		expect(mockShare).toBeCalled();
+		expect(mockNavigate).toHaveBeenCalled();
 	});
-
-	it.each(['en', 'de'])(
-		'routes to the invite page if Web Share API not available',
-		async (locale: string) => {
-			setLocale(locale);
-			sessionStorage.setItem('create', JSON.stringify(stubStatus));
-			const wrapper = await mountSuspended(page, {
-				global: {
-					mocks: {
-						$t: mockT,
-					},
-					stubs: {
-						NuxtLink: stubNuxtLink,
-					},
-				},
-			});
-			expectStage2(wrapper, locale, stubInactiveGame.id);
-
-			const mockShare = vi.fn().mockReturnValue(false);
-			navigator.share = mockShare;
-			navigator.canShare = vi.fn().mockReturnValue(false);
-
-			const button = wrapper.find('button[data-test="invite-button"]');
-			await button.trigger('click');
-			await flushPromises();
-
-			expect(mockShare).not.toBeCalled();
-			expect(mockNavigate).toHaveBeenCalled();
-		}
-	);
 
 	it.each(['en', 'de'])(
 		'will reset to stage 1 if any stage 2 mandatory data is not present',

@@ -22,9 +22,6 @@ definePageMeta({
 	},
 });
 
-const { t } = useI18n();
-const localePath = useLocalePath();
-
 const status: Ref<CreateStatus> = ref({ stage: 1, code: '' });
 const game = useGameStore();
 const input: Ref<Nullable<typeof Nickname>> = ref(null);
@@ -67,7 +64,7 @@ const create = async (): Promise<void> => {
 				status.value.code = response.id;
 				status.value.stage++;
 				sessionStorage.setItem('create', JSON.stringify(status.value));
-				game.set(parseGame(response));
+				game.set(useGame(response).parse());
 				sessionStorage.setItem('player', JSON.stringify(game.mayor));
 			})
 			.catch((e) => {
@@ -81,19 +78,6 @@ const create = async (): Promise<void> => {
 			});
 	}
 };
-
-const invite = async (event: MouseEvent) => {
-	const url = new URL(localePath(game.invite), useRequestURL()).toString();
-	const content: ShareData = {
-		title: t('invite-subject'),
-		text: t('invite-message', { inviter: game.players[0].nickname }),
-		url: url,
-	};
-	if (navigator.share && navigator.canShare(content)) {
-		event?.preventDefault();
-		await navigator.share(content);
-	}
-};
 </script>
 
 <template>
@@ -101,7 +85,7 @@ const invite = async (event: MouseEvent) => {
 		<Spinner v-if="loading" />
 		<Error v-if="isSystemError" message="unexpected-error" />
 		<div v-if="status!.stage == 1">
-			<Nickname ref="input" v-model="nickname" :server-error="validationError" />
+			<Nickname ref="input" v-model="nickname" :error="validationError" />
 			<Button
 				link="/create"
 				label="create"
@@ -117,7 +101,6 @@ const invite = async (event: MouseEvent) => {
 				label="invite-players"
 				data-test="invite-button"
 				class="w-full"
-				@click="invite"
 			/>
 			<Button :link="game.url" label="play-game" class="w-full" />
 		</div>

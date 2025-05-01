@@ -4,6 +4,7 @@ declare type Undefinable<T> = T | undefined;
 
 interface DynamoDBWrapper {
 	put: (game: Game) => Promise<void>;
+	update: (game: Game) => Promise<void>;
 	get: (id: string) => Promise<Nullable<Game>>;
 }
 
@@ -28,6 +29,7 @@ interface Game {
 	finished?: Date | string;
 	active: boolean;
 	players: Array<Player>;
+	pending?: Array<Player>;
 }
 
 interface Player {

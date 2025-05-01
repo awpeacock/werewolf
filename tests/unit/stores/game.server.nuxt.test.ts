@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 
-import { stubInactiveGame } from '@tests/unit/setup/stubs';
+import { stubGameNew } from '@tests/unit/setup/stubs';
 
 mockNuxtImport('useEnvironment', () => {
 	return () => {
@@ -21,7 +21,7 @@ describe('Game Pinia Store', () => {
 	});
 
 	it('should NOT set the stored game on session storage in server mode', async () => {
-		store.set(stubInactiveGame);
+		store.set(stubGameNew);
 		expect(sessionStorage.setItem).not.toBeCalled();
 		expect(sessionStorage.getItem('game')).toBeNull();
 	});

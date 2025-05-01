@@ -1,36 +1,54 @@
 <script setup lang="ts">
-import { useTemplateRef } from 'vue';
-
-defineProps<{
+const props = defineProps<{
 	chars: string | Array<string>;
 	editable?: boolean;
+	error?: string | null;
 }>();
 const emit = defineEmits(['update']);
 
-let code = '    ';
-const inputs = useTemplateRef('inputs');
+const element = useTemplateRef('element');
+const formfield = useFormfield(element, props.chars, toRef(props, 'error'));
 
-// Switch focus to the next input on each keypress, and keep
-// concatenating the overall "code" string
-const next = (target: EventTarget | null, idx: number): void => {
-	const input: HTMLInputElement = target as HTMLInputElement;
+// Prevent entry of any non-alphanumeric characters
+const filter = (event: KeyboardEvent): void => {
+	if (!/^[A-Za-z0-9]+$/.test(event.key)) {
+		return event.preventDefault();
+	}
+};
+// Switch focus to the next input on each keypress
+const next = (event: KeyboardEvent, idx: number): void => {
+	const input: HTMLInputElement = event.target as HTMLInputElement;
 	const value: string = input?.value;
-	if (value.length === 1) {
-		const lists: Array<HTMLLIElement> = inputs.value as Array<HTMLLIElement>;
-		lists.forEach((list) => {
-			const input = list.children[0] as HTMLInputElement;
-			const c: number = parseInt(input.getAttribute('data-key')!);
-			const char: string = input.value ? input.value : ' ';
-			code = code.substring(0, c) + char + code.substring(c + 1);
+	const list: Array<HTMLLIElement> = formfield.element as Array<HTMLLIElement>;
+	list.forEach((item) => {
+		const input = item.children[0] as HTMLInputElement;
+		const c: number = parseInt(input.getAttribute('data-key')!);
+		if (value.length === 1) {
 			if (idx < 3) {
 				if (c === idx + 1) {
 					input.focus();
 				}
 			}
-		});
-		emit('update', code);
-	}
+			emit('update', formfield.value);
+		}
+	});
 };
+const validate = (): boolean => {
+	const valid = formfield.validate(useValidation().validateCode);
+	// Clean up any blank chars so the user can enter into those
+	// inputs on return (if not the space will take up the one allowed char)
+	const list: Array<HTMLLIElement> = formfield.element as Array<HTMLLIElement>;
+	list.forEach((item) => {
+		const input = item.children[0] as HTMLInputElement;
+		if (input.value == ' ') {
+			input.value = '';
+		}
+	});
+	return valid;
+};
+// We need to expose the result of validate, so that
+// any conditional activities in the parent know to proceed.
+defineExpose({ validate });
 </script>
 
 <template>
@@ -38,19 +56,29 @@ const next = (target: EventTarget | null, idx: number): void => {
 		<li
 			v-for="(char, idx) in chars"
 			:key="idx"
-			ref="inputs"
-			class="border-2 border-yellow-200 w-1/4 mx-2 first:ml-0 last:mr-0 p-0 bg-yellow-100 text-center text-yellow-600 text-4xl font-inter"
+			ref="element"
+			class="border-2 w-1/4 mx-2 first:ml-0 last:mr-0 p-0 text-center text-4xl font-inter"
+			:class="formfield.classes"
 		>
 			<input
 				v-if="editable"
 				type="text"
-				class="w-full p-4 text-center text-yellow-600 text-4xl font-inter uppercase"
+				class="w-full p-4 text-center text-4xl font-inter uppercase"
+				:class="formfield.classes"
 				minlength="1"
 				maxlength="1"
 				:data-key="idx"
-				@keyup="next($event.target, idx)"
+				@keydown="filter($event)"
+				@keyup="next($event, idx)"
+				@focus="formfield.reset"
 			/>
 			<span v-if="!editable" class="block p-4">{{ char }}</span>
 		</li>
 	</ul>
+	<div
+		v-if="formfield.error !== ''"
+		class="-mt-4 mb-4 ml-4 mr-4 p-2 rounded-b-lg bg-red-600 text-white font-oswald"
+	>
+		{{ $t(formfield.error) }}
+	</div>
 </template>

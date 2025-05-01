@@ -13,12 +13,25 @@ const localePath = useLocalePath();
 // Cannot detect browser capabilities on server so set as false until mounted
 const game = useGameStore();
 const loaded = ref(false);
+const showShare = ref(false);
 const showInvite = ref(false);
 const showCopy = ref(false);
 const error = ref('');
 const url = ref('');
 const mailto = ref('');
 
+const share = async (event: MouseEvent) => {
+	const url = new URL(localePath(game.invite), useRequestURL()).toString();
+	const content: ShareData = {
+		title: t('invite-subject'),
+		text: t('invite-message', { inviter: game.players[0].nickname }),
+		url: url,
+	};
+	if (navigator.share && navigator.canShare(content)) {
+		event?.preventDefault();
+		await navigator.share(content);
+	}
+};
 const copy = () => {
 	navigator.clipboard.writeText(url.value);
 };
@@ -26,6 +39,7 @@ const copy = () => {
 onMounted(() => {
 	const player = sessionStorage.getItem('player');
 	showInvite.value = game.id !== '' && JSON.stringify(game.mayor) === player;
+	showShare.value = navigator.share !== undefined;
 	showCopy.value = navigator.clipboard !== undefined;
 	if (!showInvite.value) {
 		error.value = game.id === '' ? 'invite-no-game' : 'invite-not-mayor';
@@ -45,13 +59,18 @@ onMounted(() => {
 		<div v-if="showInvite">
 			<Code :chars="game!.id" />
 			<div v-show="url">
-				<p class="mb-4 font-oswald text-base text-white">{{ $t('invite-introduction') }}</p>
-				<div class="flex flex-row items-center">
-					<a :href="mailto" class="w-1/3 mb-4 mr-4">
-						<IconMail class="size-full *:fill-yellow-200" />
-					</a>
+				<BodyText>{{ $t('invite-introduction') }}</BodyText>
+				<div class="flex flex-col sm:flex-row">
+					<div class="flex flex-row justify-center items-center">
+						<span v-if="showShare" class="w-1/5 mb-4 mr-4 cursor-pointer">
+							<IconShare class="size-full *:fill-yellow-200" @click="share" />
+						</span>
+						<a :href="mailto" class="w-1/3 mb-4 mr-4">
+							<IconMail class="size-full *:fill-yellow-200" />
+						</a>
+					</div>
 					<div
-						class="flex flex-col w-full content-center border border-white rounded mb-4 p-4 font-oswald text-sm text-yellow-200"
+						class="flex flex-col w-full content-center border border-white rounded mb-4 p-4 font-oswald text-sm text-yellow-200 sm:min-w-2/3"
 					>
 						<p
 							v-if="showCopy"
@@ -59,10 +78,11 @@ onMounted(() => {
 						>
 							<IconCopy class="w-[16px]" @click="copy" />
 						</p>
-						<p class="my-auto pr-[16px]">{{ url }}</p>
+						<p class="my-auto pr-[16px] lg:text-lg">{{ url }}</p>
 					</div>
 				</div>
-				<p class="mb-4 font-oswald text-base text-white">{{ $t('invite-instructions') }}</p>
+
+				<BodyText>{{ $t('invite-instructions') }}</BodyText>
 			</div>
 		</div>
 		<div v-else>

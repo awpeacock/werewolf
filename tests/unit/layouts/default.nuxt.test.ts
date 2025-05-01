@@ -42,7 +42,7 @@ describe('Default layout', async () => {
 
 		await wrapper.vm.$router.push('/');
 		await flushPromises();
-		expect(wrapper.find('main').classes('max-sm:mb-[250px]')).not.toBeTruthy();
+		expect(wrapper.find('main').classes('max-sm:mb-[250px]')).toBeFalsy();
 
 		await wrapper.vm.$router.push('/create');
 		await flushPromises();
