@@ -31,6 +31,11 @@ export default defineNuxtConfig({
 			sourcemap: false,
 		},
 	},
+	nitro: {
+		experimental: {
+			websocket: true,
+		},
+	},
 	runtimeConfig: {
 		AWS_REGION: process.env.AWS_REGION,
 		AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,

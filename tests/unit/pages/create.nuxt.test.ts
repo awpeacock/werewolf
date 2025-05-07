@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mountSuspended } from '@nuxt/test-utils/runtime';
-import { flushPromises, RouterLinkStub, type VueWrapper } from '@vue/test-utils';
+import { flushPromises, type VueWrapper } from '@vue/test-utils';
 import { http, HttpResponse } from 'msw';
 
 import page from '@/pages/create/index.vue';
@@ -11,7 +11,8 @@ import { waitFor } from '@tests/unit/setup/global';
 import { server, spyApi } from '@tests/unit/setup/api';
 import { mockT, setLocale } from '@tests/unit/setup/i18n';
 import { mockNavigate, stubNuxtLink } from '@tests/unit/setup/navigation';
-import { stubGameNew, stubErrorNickname } from '@tests/unit/setup/stubs';
+import { stubGameNew, stubErrorNickname, stubMayor } from '@tests/unit/setup/stubs';
+import { mockWSConnect } from '@tests/unit/setup/websocket';
 
 interface UnsafeCreateStatus {
 	stage: number;
@@ -24,9 +25,13 @@ describe('Create Game page', () => {
 		code: stubGameNew.id,
 	};
 
-	const store = useGameStore();
-	vi.spyOn(store, 'set').mockImplementation((game: Game) => {
-		store.$state = game;
+	const storeGame = useGameStore();
+	vi.spyOn(storeGame, 'set').mockImplementation((game: Game) => {
+		storeGame.$state = game;
+	});
+	const storePlayer = usePlayerStore();
+	vi.spyOn(storePlayer, 'set').mockImplementation((player: Player) => {
+		storePlayer.$state = player;
 	});
 
 	const url = '/api/games';
@@ -51,7 +56,7 @@ describe('Create Game page', () => {
 					$t: mockT,
 				},
 				stubs: {
-					NuxtLink: RouterLinkStub,
+					NuxtLink: stubNuxtLink,
 				},
 			},
 		});
@@ -79,13 +84,19 @@ describe('Create Game page', () => {
 		}
 		if (expected) {
 			expect(useGameStore().set).toHaveBeenCalledWith(stubGameNew);
+			expect(usePlayerStore().set).toHaveBeenCalledWith(stubMayor);
 			expect(sessionStorage.getItem('create')).not.toBeNull();
 
 			const game: Game = useGameStore().$state;
 			expect(game).toEqual(expect.objectContaining(stubGameNew));
+			const player: Player = usePlayerStore().$state;
+			expect(player).toEqual(expect.objectContaining(stubMayor));
+			expect(mockWSConnect).toHaveBeenCalled();
 		} else {
 			expect(useGameStore().set).not.toHaveBeenCalled();
+			expect(usePlayerStore().set).not.toHaveBeenCalled();
 			expect(sessionStorage.getItem('create')).toBeNull();
+			expect(mockWSConnect).not.toHaveBeenCalled();
 		}
 	};
 
@@ -116,10 +127,10 @@ describe('Create Game page', () => {
 		expect(wrapper.text()).toContain(`invite-players (${locale})`);
 		expect(wrapper.text()).toContain(`play-game (${locale})`);
 
-		const links = wrapper.findAllComponents(RouterLinkStub);
+		const links = wrapper.findAllComponents(stubNuxtLink);
 		expect(links).not.toBeNull();
 		expect(links.length).toBe(2);
-		expect(links[1]!.props('to')).toEqual({ path: `/play/${code}` });
+		expect(links[1]!.props('to')).toEqual({ path: `/play/${code}`, query: {} });
 	};
 
 	beforeEach(() => {

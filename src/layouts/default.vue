@@ -13,6 +13,7 @@ onMounted(() => {
 <template>
 	<div v-show="loaded" class="flex flex-col">
 		<div class="flex flex-row self-end">
+			<Notifications />
 			<LocaleSwitcher />
 		</div>
 		<div class="flex flex-col md:flex-row">

@@ -37,8 +37,8 @@ const copy = () => {
 };
 
 onMounted(() => {
-	const player = sessionStorage.getItem('player');
-	showInvite.value = game.id !== '' && JSON.stringify(game.mayor) === player;
+	const player = usePlayerStore();
+	showInvite.value = game.id !== '' && game.mayor?.id === player.id;
 	showShare.value = navigator.share !== undefined;
 	showCopy.value = navigator.clipboard !== undefined;
 	if (!showInvite.value) {

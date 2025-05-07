@@ -1,6 +1,7 @@
 import type { H3Event, EventHandlerRequest } from 'h3';
 
 import { useDynamoDB } from '@/composables/useDynamoDB';
+import { useLogger } from '@/composables/useLogger';
 import {
 	GameIdNotFoundErrorResponse,
 	InvalidGameIdErrorResponse,
@@ -22,7 +23,7 @@ export default defineEventHandler(
 					return GameIdNotFoundErrorResponse;
 				}
 			} catch (e) {
-				console.error('Error occurred trying to retrieve game:', e);
+				useLogger().error('Error occurred trying to retrieve game:', e as Error);
 				setResponseStatus(event, 500);
 				return UnexpectedErrorResponse;
 			}

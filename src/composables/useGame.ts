@@ -6,6 +6,17 @@ export const useGame = (game: Game) => {
 		return game;
 	};
 
+	const getLatest = async (): Promise<Game> => {
+		try {
+			const api = `/api/games/${game.id}/`;
+			const response: Game = await $fetch<Game>(api, { method: 'GET' });
+			game = useGame(response).parse();
+			return game;
+		} catch (e) {
+			throw new Error('Unable to retrieve game', e as Error);
+		}
+	};
+
 	const mayor = (): Nullable<Player> => {
 		for (const player of game.players) {
 			if (player.role == Role.MAYOR) {
@@ -15,15 +26,15 @@ export const useGame = (game: Game) => {
 		return null;
 	};
 
-	const findPlayer = (nickname: string): Nullable<Player> => {
+	const findPlayer = (identifier: string): Nullable<Player> => {
 		for (const player of game.players) {
-			if (player.nickname === nickname) {
+			if (player.nickname === identifier || player.id === identifier) {
 				return player;
 			}
 		}
 		if (game.pending) {
 			for (const player of game.pending) {
-				if (player.nickname === nickname) {
+				if (player.nickname === identifier || player.id === identifier) {
 					return player;
 				}
 			}
@@ -31,24 +42,56 @@ export const useGame = (game: Game) => {
 		return null;
 	};
 
-	const hasPlayer = (nickname: string): boolean => {
-		return findPlayer(nickname) !== null;
+	const hasPlayer = (identifier: string): boolean => {
+		return findPlayer(identifier) !== null;
 	};
 
-	const isPlayerAdmitted = (nickname: string): boolean => {
+	const isPlayerAdmitted = (identifier: string): boolean => {
 		for (const player of game.players) {
-			if (player.nickname == nickname) {
+			if (player.nickname == identifier || player.id === identifier) {
 				return true;
 			}
 		}
 		return false;
 	};
 
+	const admitPlayer = (identifier: string): Game => {
+		if (!game.pending) {
+			throw new Error('Attempt to admit player from an empty pending list');
+		}
+		for (let p = 0; p < game.pending.length; p++) {
+			const player = game.pending[p];
+			if (player.nickname === identifier || player.id === identifier) {
+				game.players.push(player);
+				game.pending.splice(p, 1);
+				return game;
+			}
+		}
+		throw new Error('Attempt to admit player that is not on pending list');
+	};
+
+	const removePlayer = (identifier: string): Game => {
+		if (!game.pending) {
+			throw new Error('Attempt to remove player from an empty pending list');
+		}
+		for (let p = 0; p < game.pending.length; p++) {
+			const player = game.pending[p];
+			if (player.nickname === identifier || player.id === identifier) {
+				game.pending.splice(p, 1);
+				return game;
+			}
+		}
+		throw new Error('Attempt to remove player that is not on pending list');
+	};
+
 	return {
 		parse,
+		getLatest,
 		mayor,
 		findPlayer,
 		hasPlayer,
 		isPlayerAdmitted,
+		admitPlayer,
+		removePlayer,
 	};
 };

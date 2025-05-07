@@ -26,6 +26,9 @@ describe('Default layout', async () => {
 		await flushPromises();
 
 		expect(wrapper.attributes('style')).toBeUndefined();
+
+		expect(wrapper.findComponent({ name: 'Notifications' }).exists).toBeTruthy();
+		expect(wrapper.findComponent({ name: 'LocaleSwitcher' }).exists).toBeTruthy();
 	});
 
 	it('should mount successfully with and without a footer', async () => {

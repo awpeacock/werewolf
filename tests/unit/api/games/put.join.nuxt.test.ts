@@ -22,6 +22,7 @@ import {
 	stubGameIdUpdateError,
 	stubErrorCode,
 } from '@tests/unit/setup/stubs';
+import { mockWSSend } from '@tests/unit/setup/websocket';
 
 describe('Join API (PUT)', async () => {
 	const handler = await import('@/server/api/games/[id]/[action].put');
@@ -146,8 +147,22 @@ describe('Join API (PUT)', async () => {
 		stubParameters(stubGameNew.id, true, stubVillager1.nickname);
 
 		const response = await handler.default(event);
-		expectPending(response as Game, stubGameNew, 1, 1);
+		const game = response as Game;
+		expectPending(game, stubGameNew, 1, 1);
 		expect(mockResponseStatus).toBeCalledWith(event, 200);
+
+		// Test that the web socket notification is published
+		expect(mockWSSend).toHaveBeenCalledWith(
+			{
+				game: game.id,
+				player: stubMayor.id,
+			},
+			{
+				type: 'join-request',
+				game: game,
+				player: game.pending![0],
+			}
+		);
 	});
 
 	it('should take a valid request without an invite, update and return the revised game (where pending players already exist)', async () => {
@@ -286,8 +301,8 @@ describe('Join API (PUT)', async () => {
 	});
 
 	it('should return an ErrorResponse (with unexpected error) if DynamoDB fails', async () => {
-		stubParameters(stubGameIdUpdateError, true, stubVillager1.nickname);
 		const spyError = vi.spyOn(console, 'error').mockImplementation(() => null);
+		stubParameters(stubGameIdUpdateError, true, 'NewNickname');
 
 		const response = await handler.default(event);
 

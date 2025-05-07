@@ -8,6 +8,40 @@ interface DynamoDBWrapper {
 	get: (id: string) => Promise<Nullable<Game>>;
 }
 
+interface WebSocketServer {
+	clients: Map<string, Map<string, WebSocket>>;
+	send: (target: { code: string; player?: string }, event: GameEvent) => Promise<void>;
+}
+
+interface WebSocketClient {
+	send: (message: string) => void;
+	close: (code?: number, reason?: string) => void;
+}
+
+type GameEvent = JoinRequestEvent | AdmissionEvent;
+
+interface JoinRequestBody {
+	villager: string;
+}
+
+interface JoinRequestEvent {
+	type: 'join-request';
+	game: Game;
+	player: Player;
+}
+
+interface AdmissionBody {
+	auth: string;
+	villager: string;
+	admit: boolean;
+}
+
+interface AdmissionEvent {
+	type: 'admission';
+	game: Game;
+	response: boolean;
+}
+
 interface FooterMeta {
 	src: string;
 	alt: string;

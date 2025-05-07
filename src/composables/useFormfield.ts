@@ -89,7 +89,7 @@ export const useFormfield = (
 				input.oninput = update;
 			});
 		} else {
-			throw Error(
+			throw new Error(
 				'Attempt to instatiate a formfield component without a related HTML element'
 			);
 		}

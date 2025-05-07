@@ -3,7 +3,7 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 
 import { createPinia } from 'pinia';
 
-import { stubGameNew } from '@tests/unit/setup/stubs';
+import { stubVillager1 } from '@tests/unit/setup/stubs';
 
 mockNuxtImport('useEnvironment', () => {
 	return () => {
@@ -13,18 +13,18 @@ mockNuxtImport('useEnvironment', () => {
 	};
 });
 
-describe('Game Pinia Store', () => {
+describe('Player Pinia Store', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		vi.resetModules();
 		sessionStorage.clear();
 	});
 
-	it('should NOT set the stored game on session storage in server mode', async () => {
+	it('should NOT set the stored player on session storage in server mode', async () => {
 		const pinia = createPinia();
-		const store = useGameStore(pinia);
-		store.set(stubGameNew);
+		const store = usePlayerStore(pinia);
+		store.set(stubVillager1);
 		expect(sessionStorage.setItem).not.toBeCalled();
-		expect(sessionStorage.getItem('game')).toBeNull();
+		expect(sessionStorage.getItem('player')).toBeNull();
 	});
 });

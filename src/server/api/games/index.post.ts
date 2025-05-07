@@ -2,6 +2,7 @@ import type { H3Event, EventHandlerRequest } from 'h3';
 import { v4 as uuidv4 } from 'uuid';
 
 import { useDynamoDB } from '@/composables/useDynamoDB';
+import { useLogger } from '@/composables/useLogger';
 import { useValidation } from '@/composables/useValidation';
 import { Role } from '@/types/enums';
 import { NoUniqueIdErrorResponse, UnexpectedErrorResponse } from '@/types/constants';
@@ -43,7 +44,7 @@ export default defineEventHandler(
 				return game;
 			} catch (e: unknown) {
 				if ((e as Error).name !== 'ConditionalCheckFailedException') {
-					console.error('Error occurred trying to create game:', e);
+					useLogger().error('Error occurred trying to create game:', e as Error);
 					setResponseStatus(event, 500);
 					return UnexpectedErrorResponse;
 				}
@@ -51,7 +52,7 @@ export default defineEventHandler(
 		}
 
 		// We should only get here if we've exceeded the max retries limit
-		console.error('Exceeded max retries trying to create a game');
+		useLogger().error('Exceeded max retries trying to create a game');
 		setResponseStatus(event, 500);
 		return NoUniqueIdErrorResponse;
 	}

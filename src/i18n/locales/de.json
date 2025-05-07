@@ -4,8 +4,9 @@
 	"logo-alt": "Werwolf heult den Mond an",
 	"unexpected-error": "Etwas Unerwartetes ist schiefgelaufen. Bitte versuchen Sie es später noch einmal.",
 	"go-back": "Geh zurück",
-	"create-game": "Spiel erstellen",
-	"join-game": "Spiel beitreten",
+	"try-again": "Versuchen Sie es erneut",
+	"create-game": "Neues Spiel erstellen",
+	"join-game": "Neuem Spiel beitreten",
 	"play-game": "Spiel spielen",
 	"resume-game": "Spiel fortsetzen",
 	"nickname": "Spitzname",
@@ -35,5 +36,10 @@
 	"waiting-alt-text": "Ein gelangweilter mittelalterlicher Dorfbewohner sitzt auf einer Bank und wartet",
 	"you-are-waiting-to-be-admitted": "Sie warten nun auf die Zulassung zum Spiel.",
 	"the-mayor-has-been-informed": "Der Bürgermeister {mayor} wurde benachrichtigt, dass Sie warten, und sollte Sie hoffentlich bald einlassen.",
-	"do-not-leave-or-you-will-need-to-request-join-again": "Verlassen Sie diese Seite nicht, sonst müssen Sie die Mitgliedschaft erneut beantragen. Aktualisieren Sie die Seite nicht und gehen Sie nicht zurück. Die Seite wird automatisch neu geladen, sobald Sie zugelassen sind."
+	"do-not-leave-or-you-will-need-to-request-join-again": "Verlassen Sie diese Seite nicht, sonst müssen Sie die Mitgliedschaft erneut beantragen. Aktualisieren Sie die Seite nicht und gehen Sie nicht zurück. Die Seite wird automatisch neu geladen, sobald Sie zugelassen sind.",
+	"waiting-to-be-admitted": "möchte betreiten",
+	"you-are-in": "Gute Neuigkeiten – Sie sind dabei!!",
+	"mayor-has-let-you-in": "{mayor} hat Ihre Anfrage angenommen. Sie können das Spiel jetzt spielen. Klicken Sie dazu einfach auf den untenstehenden Link.",
+	"denied": "Es tut mir leid, Ihnen wurde kein Zugriff gewährt.",
+	"mayor-has-rejected-your-request": "{mayor} hat Ihre Anfrage nicht angenommen. Möglicherweise haben sie Ihren Spitznamen nicht erkannt. Versuchen Sie es erneut und teilen Sie ihnen mit, dass Sie ihn erkannt haben."
 }

@@ -7,6 +7,8 @@ import page from '@/pages/join/[[id]].vue';
 import { useGameStore } from '@/stores/game';
 import { GameIdNotFoundErrorResponse, UnexpectedErrorResponse } from '@/types/constants';
 
+import { Role } from '@/types/enums';
+
 import { waitFor } from '@tests/unit/setup/global';
 import { server, spyApi } from '@tests/unit/setup/api';
 import { mockT, setLocale } from '@tests/unit/setup/i18n';
@@ -14,13 +16,25 @@ import {
 	stubErrorCode,
 	stubErrorNickname,
 	stubGameInactive,
+	stubGameNew,
 	stubGamePending,
+	stubPlayerBlank,
+	stubVillager1,
+	stubVillager2,
 } from '@tests/unit/setup/stubs';
+import { mockWSDisconnect, mockWSLatest } from '@tests/unit/setup/websocket';
 
 describe('Join Game page', () => {
-	const store = useGameStore();
-	vi.spyOn(store, 'set').mockImplementation((game: Game) => {
-		store.$state = structuredClone(game);
+	const storeGame = useGameStore();
+	const spyGame = vi.spyOn(storeGame, 'set').mockImplementation((game: Game) => {
+		storeGame.$state = { ...game };
+	});
+	const storePlayer = usePlayerStore();
+	const spyPlayer = vi.spyOn(storePlayer, 'set').mockImplementation((player: Player) => {
+		storePlayer.$state = { ...player };
+	});
+	vi.spyOn(storePlayer, '$reset').mockImplementation(() => {
+		storePlayer.$state = { ...stubPlayerBlank };
 	});
 
 	const url = '/api/games/';
@@ -53,9 +67,11 @@ describe('Join Game page', () => {
 		responseCode: number,
 		responseData: Game | APIErrorResponse
 	): Promise<void> => {
+		let body;
 		server.use(
-			http.put(url + id + '/join', (request) => {
-				spyApi(request);
+			http.put(url + id + '/join', async ({ request }) => {
+				body = await request.json();
+				spyApi(body);
 				return HttpResponse.json(responseData, { status: responseCode });
 			})
 		);
@@ -84,11 +100,21 @@ describe('Join Game page', () => {
 		if (submit) {
 			await waitFor(() => !wrapper.findComponent({ name: 'Spinner' }).exists());
 			expect(spyApi).toHaveBeenCalled();
+
+			const expected: JoinRequestBody = {
+				villager: name,
+			};
+			expect(body).toEqual(expected);
 		} else {
 			expect(spyApi).not.toHaveBeenCalled();
 		}
 		if (responseCode === 200) {
-			expect(useGameStore().set).toHaveBeenCalledWith(responseData);
+			expect(spyGame).toHaveBeenCalledWith(responseData);
+			if (JSON.stringify(responseData).includes(name)) {
+				expect(spyPlayer).toHaveBeenCalledWith(
+					expect.objectContaining({ nickname: name, role: Role.VILLAGER })
+				);
+			}
 
 			const data: Game = responseData as Game;
 			const game: Game = useGameStore().$state;
@@ -105,7 +131,8 @@ describe('Join Game page', () => {
 			await flushPromises();
 			await nextTick();
 		} else {
-			expect(useGameStore().set).not.toHaveBeenCalled();
+			expect(spyGame).not.toHaveBeenCalled();
+			expect(spyPlayer).not.toHaveBeenCalled();
 		}
 	};
 
@@ -134,12 +161,24 @@ describe('Join Game page', () => {
 	};
 
 	const expectWait = (wrapper: VueWrapper<InstanceType<typeof page>>, locale: string) => {
+		waitFor(() => wrapper.text().includes(`you-are-waiting-to-be-admitted (${locale})`));
 		expect(wrapper.text()).toContain(`you-are-waiting-to-be-admitted (${locale})`);
+	};
+
+	const expectAdmitted = (wrapper: VueWrapper<InstanceType<typeof page>>, locale: string) => {
+		waitFor(() => wrapper.text().includes(`you-are-in (${locale})`));
+		expect(wrapper.text()).toContain(`you-are-in (${locale})`);
+	};
+
+	const expectDenied = (wrapper: VueWrapper<InstanceType<typeof page>>, locale: string) => {
+		waitFor(() => wrapper.text().includes(`denied (${locale})`));
+		expect(wrapper.text()).toContain(`denied (${locale})`);
 	};
 
 	beforeEach(() => {
 		sessionStorage.clear();
 		useGameStore().$reset();
+		usePlayerStore().$reset();
 		vi.clearAllMocks();
 	});
 
@@ -151,6 +190,36 @@ describe('Join Game page', () => {
 		const wrapper = await setupPage(locale);
 		expectForm(wrapper, locale);
 	});
+
+	it.each(['en', 'de'])(
+		'renders the correct state if pending progress in session',
+		async (locale: string) => {
+			useGameStore().set(stubGamePending);
+			usePlayerStore().set(stubVillager1);
+			const wrapper = await setupPage(locale);
+			expectWait(wrapper, locale);
+		}
+	);
+
+	it.each(['en', 'de'])(
+		'renders the correct state if admitted progress in session',
+		async (locale: string) => {
+			useGameStore().set(stubGameInactive);
+			usePlayerStore().set(stubVillager1);
+			const wrapper = await setupPage(locale);
+			expectAdmitted(wrapper, locale);
+		}
+	);
+
+	it.each(['en', 'de'])(
+		'renders the correct state if denied progress in session',
+		async (locale: string) => {
+			useGameStore().set(stubGameInactive);
+			usePlayerStore().set(stubVillager2);
+			const wrapper = await setupPage(locale);
+			expectDenied(wrapper, locale);
+		}
+	);
 
 	it.each(['en', 'de'])(
 		'submits the form successfully for a pending request',
@@ -186,6 +255,62 @@ describe('Join Game page', () => {
 			);
 			//TODO: Re-enable this when the page has been created (it won't fire until it does)
 			// expect(mockNavigate).toHaveBeenCalledWith(`/play/${stubGameInactive.id}`);
+		}
+	);
+
+	it.each(['en', 'de'])(
+		'reacts appropriately when an admitted response is published to a join request',
+		async (locale: string) => {
+			const wrapper = await setupPage(locale);
+			await triggerInput(
+				wrapper,
+				stubGamePending.id,
+				stubGamePending.pending![0]!.nickname,
+				true,
+				200,
+				stubGamePending
+			);
+
+			mockWSLatest.value = {
+				type: 'admission',
+				game: stubGamePending,
+				response: true,
+			};
+			await flushPromises();
+
+			expectAdmitted(wrapper, locale);
+		}
+	);
+
+	it.each(['en', 'de'])(
+		'reacts appropriately when a denied response is published to a join request',
+		async (locale: string) => {
+			const wrapper = await setupPage(locale);
+			await triggerInput(
+				wrapper,
+				stubGamePending.id,
+				stubGamePending.pending![0]!.nickname,
+				true,
+				200,
+				stubGamePending
+			);
+
+			mockWSLatest.value = {
+				type: 'admission',
+				game: stubGameNew,
+				response: false,
+			};
+			await flushPromises();
+
+			expect(mockWSDisconnect).toBeCalled();
+			expect(usePlayerStore().$reset).toBeCalled();
+			expectDenied(wrapper, locale);
+
+			const button = wrapper.find('button');
+			await button.trigger('click');
+			await flushPromises();
+
+			expectForm(wrapper, locale);
 		}
 	);
 
@@ -251,5 +376,26 @@ describe('Join Game page', () => {
 		const wrapper = await setupPage(locale);
 		await triggerInput(wrapper, 'ABCD', 'TestPlayer', true, 500, UnexpectedErrorResponse);
 		expectForm(wrapper, locale, undefined, undefined, true);
+	});
+
+	it.each(['en', 'de'])('ignores join requests', async (locale: string) => {
+		const wrapper = await setupPage(locale);
+		await triggerInput(
+			wrapper,
+			stubGamePending.id,
+			stubGamePending.pending![0]!.nickname,
+			true,
+			200,
+			stubGamePending
+		);
+
+		mockWSLatest.value = {
+			type: 'join-request',
+			game: stubGamePending,
+			player: stubVillager2,
+		};
+		await flushPromises();
+
+		expectWait(wrapper, locale);
 	});
 });

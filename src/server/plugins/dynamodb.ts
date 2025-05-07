@@ -7,6 +7,8 @@ import {
 	UpdateCommand,
 } from '@aws-sdk/lib-dynamodb';
 
+import { useLogger } from '@/composables/useLogger';
+
 export default defineNitroPlugin((nitro) => {
 	const config = useRuntimeConfig();
 
@@ -35,7 +37,7 @@ export default defineNitroPlugin((nitro) => {
 				});
 				await docClient.send(put);
 			} catch (e) {
-				console.error(`Unable to save game: ${(e as Error).message}`);
+				useLogger().error(`Unable to save game: ${(e as Error).message}`);
 				throw e;
 			}
 		},
@@ -56,7 +58,7 @@ export default defineNitroPlugin((nitro) => {
 				});
 				await docClient.send(update);
 			} catch (e) {
-				console.error(`Unable to update game: ${(e as Error).message}`);
+				useLogger().error(`Unable to update game: ${(e as Error).message}`);
 				throw e;
 			}
 		},
@@ -83,7 +85,7 @@ export default defineNitroPlugin((nitro) => {
 				}
 				return null;
 			} catch (e) {
-				console.error(`Unable to retrieve game: ${(e as Error).message}`);
+				useLogger().error(`Unable to retrieve game: ${(e as Error).message}`);
 				throw e;
 			}
 		},

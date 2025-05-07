@@ -42,7 +42,11 @@ export const useGameStore = defineStore('game', {
 			}
 		},
 		url(): string {
-			return '/play/' + this.id;
+			if (this.id.trim().length === 4) {
+				return '/play/' + this.id;
+			} else {
+				return '';
+			}
 		},
 		mayor(): Nullable<Player> {
 			return useGame(this).mayor();

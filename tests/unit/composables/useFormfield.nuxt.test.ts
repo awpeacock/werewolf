@@ -37,24 +37,34 @@ describe('useFormfield', () => {
 		};
 	};
 
-	it('should successfully instantiate with a valid component', () => {
-		const input = document.createElement('input');
-		const formfieldSingle = useFormfield(ref(input), 'Default Value', ref(null));
+	it('should successfully instantiate with a valid component', async () => {
+		// Test with a single input
+		const wrapperSingle = mount(single(ref(undefined)));
+		await nextTick();
 
-		expect(formfieldSingle.value).toEqual('Default Value');
+		const formfieldSingle = wrapperSingle.vm.formfield as UseFormFieldReturn;
+		const inputSingle = wrapperSingle.find('input');
+		await inputSingle.setValue('Single input value');
+		await inputSingle.trigger('input');
+		await nextTick();
+
+		expect(formfieldSingle.value).toEqual('Single input value');
 		expect(formfieldSingle.error).toEqual('');
 
-		const firstInput = document.createElement('input');
-		const secondInput = document.createElement('input');
-		const firstContainer = document.createElement('div');
-		firstContainer.appendChild(firstInput);
-		const secondContainer = document.createElement('div');
-		secondContainer.appendChild(secondInput);
-		const formfieldArray = useFormfield(
-			ref([firstContainer, secondContainer]),
-			['Multiple ', 'Values'],
-			ref(null)
-		);
+		// Test with an array of inputs
+		const wrapperArray = mount(array(ref(undefined)));
+		await nextTick();
+
+		const formfieldArray = wrapperArray.vm.formfield as UseFormFieldReturn;
+		const inputArray = wrapperArray.findAll('input');
+
+		await inputArray[0].setValue('Multiple ');
+		await inputArray[0].trigger('input');
+		await nextTick();
+
+		await inputArray[1].setValue('Values');
+		await inputArray[1].trigger('input');
+		await nextTick();
 
 		expect(formfieldArray.value).toEqual('Multiple Values');
 		expect(formfieldArray.error).toEqual('');

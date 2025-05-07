@@ -1,5 +1,10 @@
 import { Role } from '@/types/enums';
 
+export const stubPlayerBlank: Player = {
+	id: '',
+	nickname: '',
+	role: Role.VILLAGER,
+};
 export const stubMayor: Player = {
 	id: 'a1b2a483-79ec-4790-a440-73415f223de1',
 	nickname: 'Test Mayor',
@@ -15,6 +20,11 @@ export const stubVillager2: Player = {
 	nickname: 'Test Villager 2',
 	role: Role.VILLAGER,
 };
+export const stubVillager3: Player = {
+	id: 'accd6ea8-8910-4744-add2-8068dd9e1f53',
+	nickname: 'Test Villager 3',
+	role: Role.VILLAGER,
+};
 
 export const stubGameIdPutError = 'PUTF';
 export const stubGameIdDuplicateError = 'DUPE';
@@ -22,6 +32,12 @@ export const stubGameIdUpdateError = 'UPDF';
 export const stubGameIdGetError = 'GETF';
 export const stubGameIdNotFound = 'NONE';
 
+export const stubGameBlank: Game = {
+	id: '',
+	created: new Date(),
+	active: false,
+	players: [],
+};
 export const stubGameNew: Game = {
 	id: 'A1B2',
 	created: new Date(),
@@ -58,6 +74,7 @@ export const stubGameUpdateFailure: Game = {
 	created: new Date(),
 	active: false,
 	players: [stubMayor],
+	pending: [stubVillager1],
 };
 
 export const stubErrorCode: APIErrorResponse = {

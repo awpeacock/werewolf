@@ -64,8 +64,11 @@ const create = async (): Promise<void> => {
 				status.value.code = response.id;
 				status.value.stage++;
 				sessionStorage.setItem('create', JSON.stringify(status.value));
+				// Store the game and player details respectively
 				game.set(useGame(response).parse());
-				sessionStorage.setItem('player', JSON.stringify(game.mayor));
+				usePlayerStore().set(game.mayor as Player);
+				// Now setup the connection to listen for notifications
+				useWebSocketClient().connect(game, game.mayor!);
 			})
 			.catch((e) => {
 				loading.value = false;

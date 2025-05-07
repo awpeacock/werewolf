@@ -4,6 +4,7 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { Role } from '@/types/enums';
 
 import {
+	stubGameBlank,
 	stubGameInactive,
 	stubGameNew,
 	stubGamePending,
@@ -139,5 +140,11 @@ describe('Game Pinia Store', () => {
 		store.set(stubGameNew);
 		const url = store.url;
 		expect(url).toEqual(`/play/${stubGameNew.id}`);
+	});
+
+	it('should return an empty string instead of a URL if the game is not setup', async () => {
+		store.set(stubGameBlank);
+		const url = store.url;
+		expect(url).toEqual('');
 	});
 });

@@ -3,25 +3,26 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { useDynamoDB } from '@/composables/useDynamoDB';
 import { useGame } from '@/composables/useGame';
+import { useLogger } from '@/composables/useLogger';
 import { useValidation } from '@/composables/useValidation';
+import { useWebSocketBroadcast } from '@/server/util/useWebSocketBroadcast';
 import {
 	GameIdNotFoundErrorResponse,
 	InvalidActionErrorResponse,
 	NicknameAlreadyExistsErrorResponse,
+	PlayerAlreadyAdmittedErrorResponse,
+	PlayerIdNotFoundErrorResponse,
+	UnauthorisedErrorResponse,
 	UnexpectedErrorResponse,
 } from '@/types/constants';
 import { Role } from '@/types/enums';
-
-interface JoinRequest {
-	villager: string;
-}
 
 export default defineEventHandler(
 	async (event: H3Event<EventHandlerRequest>): Promise<Game | APIErrorResponse> => {
 		// Handler for all join requests
 		const handleJoin = async (game: Game) => {
 			const invite = getQuery(event).invite;
-			const body: JoinRequest = await readBody(event);
+			const body: JoinRequestBody = await readBody(event);
 
 			// Never trust only on client-side validation - let's do it all again
 			const errors: Array<APIError> = useValidation().validateNickname(body.villager);
@@ -31,7 +32,8 @@ export default defineEventHandler(
 				return response;
 			}
 
-			const existing: boolean = useGame(game).hasPlayer(body.villager);
+			const gameUtil = useGame(game);
+			const existing: boolean = gameUtil.hasPlayer(body.villager);
 			if (existing) {
 				setResponseStatus(event, 400);
 				return NicknameAlreadyExistsErrorResponse;
@@ -42,8 +44,9 @@ export default defineEventHandler(
 				role: Role.VILLAGER,
 			};
 
-			const mayor = useGame(game).mayor();
+			const mayor = gameUtil.mayor();
 			const admit = mayor && mayor?.id === invite;
+			let broadcast = false;
 			if (admit) {
 				game.players.push(player);
 			} else {
@@ -51,10 +54,69 @@ export default defineEventHandler(
 					game.pending = [];
 				}
 				game.pending!.push(player);
+				broadcast = true;
 			}
 
 			const dynamo: DynamoDBWrapper = useDynamoDB(event);
 			await dynamo.update(game);
+			if (broadcast) {
+				// Broadcast to the mayor
+				const broadcast = useWebSocketBroadcast();
+				const payload: JoinRequestEvent = {
+					type: 'join-request',
+					game: game,
+					player: player,
+				};
+				broadcast.send({ game: game.id, player: useGame(game).mayor()!.id }, payload);
+			}
+			setResponseStatus(event, 200);
+			return game;
+		};
+
+		// Handler for all admission responses
+		const handleAdmit = async (game: Game) => {
+			const body: AdmissionBody = await readBody(event);
+
+			const gameUtil = useGame(game);
+			// Only the mayor can admit players
+			const mayor = gameUtil.mayor();
+			if (mayor?.id !== body.auth) {
+				setResponseStatus(event, 403);
+				return UnauthorisedErrorResponse;
+			}
+			// Can't admit a player that doesn't exist
+			const exists: boolean = gameUtil.hasPlayer(body.villager);
+			if (!exists) {
+				setResponseStatus(event, 404);
+				return PlayerIdNotFoundErrorResponse;
+			}
+			// If the player is already admitted no point wasting processing power
+			if (gameUtil.isPlayerAdmitted(body.villager)) {
+				if (body.admit) {
+					setResponseStatus(event, 200);
+					return game;
+				} else {
+					setResponseStatus(event, 400);
+					return PlayerAlreadyAdmittedErrorResponse;
+				}
+			}
+
+			if (body.admit) {
+				game = gameUtil.admitPlayer(body.villager);
+			} else {
+				game = gameUtil.removePlayer(body.villager);
+			}
+
+			const dynamo: DynamoDBWrapper = useDynamoDB(event);
+			await dynamo.update(game);
+			// Broadcast to the villager in question
+			const broadcast = useWebSocketBroadcast();
+			const payload: AdmissionEvent = {
+				type: 'admission',
+				game: game,
+				response: body.admit,
+			};
+			broadcast.send({ game: game.id, player: body.villager }, payload);
 			setResponseStatus(event, 200);
 			return game;
 		};
@@ -75,9 +137,9 @@ export default defineEventHandler(
 					case 'join': {
 						return await handleJoin(game);
 					}
-					// case 'admit': {
-					// 	return await handleAdmit(game);
-					// }
+					case 'admit': {
+						return await handleAdmit(game);
+					}
 					// case 'start': {
 					// 	return await handleStart(game);
 					// }
@@ -106,7 +168,7 @@ export default defineEventHandler(
 				return GameIdNotFoundErrorResponse;
 			}
 		} catch (e: unknown) {
-			console.error('Error occurred trying to update game:', e);
+			useLogger().error('Error occurred trying to update game:', e as Error);
 			setResponseStatus(event, 500);
 			return UnexpectedErrorResponse;
 		}

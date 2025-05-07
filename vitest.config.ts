@@ -11,6 +11,7 @@ export default defineVitestConfig({
 			'../tests/unit/setup/i18n.ts',
 			'../tests/unit/setup/navigation.ts',
 			'../tests/unit/setup/storage.ts',
+			'../tests/unit/setup/websocket.ts',
 		],
 		coverage: {
 			provider: 'istanbul',

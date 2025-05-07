@@ -4,8 +4,9 @@
 	"logo-alt": "Werewolf howling at the moon",
 	"unexpected-error": "Something unexpected has gone wrong.  Please try again later.",
 	"go-back": "Go back",
-	"create-game": "Create Game",
-	"join-game": "Join Game",
+	"try-again": "Try again",
+	"create-game": "Create New Game",
+	"join-game": "Join New Game",
 	"play-game": "Play Game",
 	"resume-game": "Resume Game",
 	"nickname": "Nickname",
@@ -35,5 +36,10 @@
 	"waiting-alt-text": "A bored medieval villager sitting on a bench waiting",
 	"you-are-waiting-to-be-admitted": "You are now waiting to be admitted to the game.",
 	"the-mayor-has-been-informed": "The mayor {mayor} has been notified that you are waiting, and should hopefully let you in soon.",
-	"do-not-leave-or-you-will-need-to-request-join-again": "Don't leave this page or you will need to request to join again - do not refresh or go back.  The page will automatically reload when you are admitted."
+	"do-not-leave-or-you-will-need-to-request-join-again": "Don't leave this page or you will need to request to join again - do not refresh or go back.  The page will automatically reload when you are admitted.",
+	"waiting-to-be-admitted": "wants to join",
+	"you-are-in": "Good news - you're in!",
+	"mayor-has-let-you-in": "{mayor} has accepted your request. You can now play the game, just click on the link below.",
+	"denied": "Sorry - you've not been granted access",
+	"mayor-has-rejected-your-request": "{mayor} has not accepted your request. Maybe they didn't recognise your nickname - feel free to try again, and let them know you are."
 }

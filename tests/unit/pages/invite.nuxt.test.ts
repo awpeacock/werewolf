@@ -12,7 +12,6 @@ import { mockT, setLocale } from '@tests/unit/setup/i18n';
 import { stubGameNew, stubMayor, stubVillager1 } from '@tests/unit/setup/stubs';
 
 describe('Invite page', () => {
-	const store = useGameStore();
 	const mockShare = vi.fn();
 	const mockWriteText = vi.fn();
 
@@ -44,10 +43,10 @@ describe('Invite page', () => {
 		});
 
 		if (game) {
+			useGameStore().set(game);
 			if (player) {
-				sessionStorage.setItem('player', JSON.stringify(player));
+				usePlayerStore().set(player);
 			}
-			store.set(game);
 		}
 
 		const wrapper = await mountSuspended(page, {
@@ -62,7 +61,8 @@ describe('Invite page', () => {
 
 	beforeEach(() => {
 		sessionStorage.clear();
-		store.$reset();
+		useGameStore().$reset();
+		usePlayerStore().$reset();
 		vi.clearAllMocks();
 	});
 
@@ -96,7 +96,7 @@ describe('Invite page', () => {
 	);
 
 	it.each(['en', 'de'])(
-		'shows a warning page if the user is not the mayor the game being created',
+		'shows a warning page if the user is not the mayor of the game being created',
 		async (locale: string) => {
 			const wrapper = await setupPage(locale, true, true, true, stubGameNew, stubVillager1);
 
@@ -107,7 +107,6 @@ describe('Invite page', () => {
 	);
 
 	it.each(['en', 'de'])('uses the Web Share API to send a link', async (locale: string) => {
-		// sessionStorage.setItem('create', JSON.stringify(stubStatus));
 		const wrapper = await setupPage(locale, true, true, true, stubGameNew, stubMayor);
 
 		expect(wrapper.findComponent(IconShare).exists()).toBeTruthy();

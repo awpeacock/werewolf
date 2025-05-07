@@ -8,7 +8,7 @@ describe('Werewolf App', async () => {
 		const component = await mountSuspended(App, { route: '/' });
 		expect(component.html()).toMatch(/<h1.+?>Werewolf<\/h1>/);
 		expect(component.html()).toMatch(
-			/<nav><button.+?>Create Game<\/button><button.+?>Join Game<\/button>/
+			/<nav><button.+?>Create New Game<\/button><button.+?>Join New Game<\/button>/
 		);
 	});
 });
