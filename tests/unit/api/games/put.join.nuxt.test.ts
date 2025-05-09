@@ -74,7 +74,7 @@ describe('Join API (PUT)', async () => {
 			expect.arrayContaining([
 				expect.objectContaining({
 					nickname: stubVillager1.nickname,
-					role: stubVillager1.role,
+					roles: [],
 				}),
 			])
 		);
@@ -83,7 +83,7 @@ describe('Join API (PUT)', async () => {
 				expect.arrayContaining([
 					expect.objectContaining({
 						nickname: player.nickname,
-						role: player.role,
+						roles: [],
 					}),
 				])
 			);
@@ -108,11 +108,11 @@ describe('Join API (PUT)', async () => {
 			expect.arrayContaining([
 				expect.objectContaining({
 					nickname: stubMayor.nickname,
-					role: stubMayor.role,
+					roles: stubMayor.roles,
 				}),
 				expect.objectContaining({
 					nickname: stubVillager1.nickname,
-					role: stubVillager1.role,
+					roles: stubVillager1.roles,
 				}),
 			])
 		);
@@ -121,7 +121,7 @@ describe('Join API (PUT)', async () => {
 				expect.arrayContaining([
 					expect.objectContaining({
 						nickname: player.nickname,
-						role: player.role,
+						roles: player.roles,
 					}),
 				])
 			);

@@ -18,7 +18,7 @@ interface WebSocketClient {
 	close: (code?: number, reason?: string) => void;
 }
 
-type GameEvent = JoinRequestEvent | AdmissionEvent;
+type GameEvent = JoinRequestEvent | AdmissionEvent | StartGameEvent;
 
 interface JoinRequestBody {
 	villager: string;
@@ -40,6 +40,16 @@ interface AdmissionEvent {
 	type: 'admission';
 	game: Game;
 	response: boolean;
+}
+
+interface StartGameBody {
+	auth: string;
+}
+
+interface StartGameEvent {
+	type: 'start-game';
+	game: Game;
+	role: Role;
 }
 
 interface FooterMeta {
@@ -69,5 +79,5 @@ interface Game {
 interface Player {
 	id: string;
 	nickname: string;
-	role: Role;
+	roles: Array<Role>;
 }

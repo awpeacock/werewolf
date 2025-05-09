@@ -3,6 +3,7 @@ const props = defineProps<{
 	link: string;
 	label: string;
 	class: string;
+	disabled?: boolean;
 }>();
 defineOptions({
 	inheritAttrs: false,
@@ -10,6 +11,15 @@ defineOptions({
 const emit = defineEmits<{
 	(_e: 'click', _event: MouseEvent): void;
 }>();
+
+const colours = computed(() => {
+	return props.disabled
+		? 'border-stone-900 bg-stone-400 text-stone-900'
+		: 'border-yellow-200 bg-yellow-600 text-yellow-100';
+});
+const clazz = computed(() => {
+	return props.class + ' ' + colours.value;
+});
 
 const localePath = useLocalePath();
 const target = { path: localePath(props.link), query: {} };
@@ -30,8 +40,8 @@ if (props.link.indexOf('?') !== -1) {
 	<NuxtLink v-slot="{ navigate }" :to="target" custom>
 		<button
 			role="link"
-			class="border-2 border-yellow-200 rounded-2xl mb-4 p-4 bg-yellow-600 text-yellow-100 font-oswald text-xl cursor-pointer"
-			:class="props.class"
+			class="border-2 rounded-2xl mb-4 p-4 font-oswald text-xl cursor-pointer"
+			:class="clazz"
 			v-bind="$attrs"
 			@click="
 				(event) => {

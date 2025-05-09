@@ -34,7 +34,7 @@ export default defineEventHandler(
 				id: id,
 				created: new Date(),
 				active: false,
-				players: [{ id: uuidv4(), nickname: body.mayor, role: Role.MAYOR }],
+				players: [{ id: uuidv4(), nickname: body.mayor, roles: [Role.MAYOR] }],
 			};
 
 			try {

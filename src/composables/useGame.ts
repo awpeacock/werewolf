@@ -19,7 +19,7 @@ export const useGame = (game: Game) => {
 
 	const mayor = (): Nullable<Player> => {
 		for (const player of game.players) {
-			if (player.role == Role.MAYOR) {
+			if (player.roles.includes(Role.MAYOR)) {
 				return player;
 			}
 		}

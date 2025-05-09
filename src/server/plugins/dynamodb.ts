@@ -49,10 +49,12 @@ export default defineNitroPlugin((nitro) => {
 					Key: {
 						Id: game.id,
 					},
-					UpdateExpression: 'SET Players = :players, Pending = :pending',
+					UpdateExpression:
+						'SET Players = :players, Pending = :pending, Active = :active',
 					ExpressionAttributeValues: {
 						':players': game.players,
 						':pending': game.pending,
+						':active': game.active,
 					},
 					ReturnValues: 'ALL_NEW',
 				});
@@ -96,5 +98,5 @@ export default defineNitroPlugin((nitro) => {
 		event.context.dynamo = dynamo;
 	});
 
-	console.log('\x1b[1m\x1b[32m\u2713\x1b[0m DynamoDB Client initialised');
+	useLogger().success('DynamoDB Client initialised');
 });

@@ -41,7 +41,7 @@ export default defineEventHandler(
 			const player: Player = {
 				id: uuidv4(),
 				nickname: body.villager,
-				role: Role.VILLAGER,
+				roles: [],
 			};
 
 			const mayor = gameUtil.mayor();
@@ -121,6 +121,55 @@ export default defineEventHandler(
 			return game;
 		};
 
+		// Handler to start the game
+		const handleStart = async (game: Game) => {
+			const body: StartGameBody = await readBody(event);
+
+			const gameUtil = useGame(game);
+			// Only the mayor can admit players
+			const mayor = gameUtil.mayor();
+			if (mayor?.id !== body.auth) {
+				setResponseStatus(event, 403);
+				return UnauthorisedErrorResponse;
+			}
+			game.active = true;
+
+			// Assign the wolf and healer roles
+			const wolf = Math.floor(Math.random() * game.players.length);
+			const healer = Math.floor(Math.random() * game.players.length);
+			game.players[wolf].roles.push(Role.WOLF);
+			if (wolf === healer && healer < game.players.length - 1) {
+				game.players[healer + 1].roles.push(Role.HEALER);
+			} else if (wolf === healer) {
+				game.players[0].roles.push(Role.HEALER);
+			} else {
+				game.players[healer].roles.push(Role.HEALER);
+			}
+			for (const player of game.players) {
+				if (
+					player.roles.length === 0 ||
+					(player.roles.length === 1 && player.roles[0] === Role.MAYOR)
+				) {
+					player.roles.push(Role.VILLAGER);
+				}
+			}
+
+			const dynamo: DynamoDBWrapper = useDynamoDB(event);
+			await dynamo.update(game);
+			// Broadcast to the villager in question
+			const broadcast = useWebSocketBroadcast();
+			for (const player of game.players) {
+				const payload: StartGameEvent = {
+					type: 'start-game',
+					game: game,
+					role: player.roles.filter((role) => role !== Role.MAYOR)[0],
+				};
+				broadcast.send({ game: game.id, player: player.id }, payload);
+			}
+			setResponseStatus(event, 200);
+			return game;
+		};
+
 		try {
 			const id = getRouterParam(event, 'id');
 			const errors: Array<APIError> = useValidation().validateCode(id);
@@ -140,9 +189,9 @@ export default defineEventHandler(
 					case 'admit': {
 						return await handleAdmit(game);
 					}
-					// case 'start': {
-					// 	return await handleStart(game);
-					// }
+					case 'start': {
+						return await handleStart(game);
+					}
 					// case 'night': {
 					// 	return await handleNight(game);
 					// }

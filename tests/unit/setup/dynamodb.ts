@@ -16,6 +16,7 @@ import {
 	stubGameInactive,
 	stubGameNew,
 	stubGamePending,
+	stubGameReady,
 	stubGameUpdateFailure,
 } from '@tests/unit/setup/stubs';
 
@@ -89,6 +90,10 @@ vi.mock('@aws-sdk/lib-dynamodb', () => {
 							}
 							case stubGamePending.id: {
 								response = stubGamePending;
+								break;
+							}
+							case stubGameReady.id: {
+								response = stubGameReady;
 								break;
 							}
 							case stubGameUpdateFailure.id: {

@@ -72,7 +72,7 @@ describe('Game Pinia Store', () => {
 	it('should return null trying to return a mayor for a game without one', async () => {
 		// Something will have to have gone seriously wrong, but ensure it's handled anyway
 		store.set(stubGameNew);
-		store.players = [{ id: '1234', nickname: 'Villager', role: Role.VILLAGER }];
+		store.players = [{ id: '1234', nickname: 'Villager', roles: [Role.VILLAGER] }];
 		expect(store.mayor).toBeNull();
 	});
 

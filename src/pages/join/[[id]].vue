@@ -136,6 +136,7 @@ watch(
 			if (event.type === 'admission') {
 				const admission = event as AdmissionEvent;
 				if (admission.response) {
+					game.set(event.game);
 					state.value = 'admitted';
 				} else {
 					socket.disconnect();
@@ -172,18 +173,14 @@ watch(
 			<BouncingDots />
 		</div>
 		<div v-if="state === 'admitted'">
-			<h3 class="mb-4 font-oswald text-xl text-base text-yellow-200">
-				{{ $t('you-are-in') }}
-			</h3>
+			<Heading>{{ $t('you-are-in') }}</Heading>
 			<BodyText>
 				{{ $t('mayor-has-let-you-in', { mayor: game.mayor?.nickname }) }}
 			</BodyText>
 			<Button :link="game.url" label="play-game" class="w-full" />
 		</div>
 		<div v-if="state === 'denied'">
-			<h3 class="mb-4 font-oswald text-xl text-base text-yellow-200">
-				{{ $t('denied') }}
-			</h3>
+			<Heading>{{ $t('denied') }}</Heading>
 			<BodyText>
 				{{ $t('mayor-has-rejected-your-request', { mayor: game.mayor?.nickname }) }}
 			</BodyText>

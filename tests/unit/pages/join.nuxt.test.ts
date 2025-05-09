@@ -7,8 +7,6 @@ import page from '@/pages/join/[[id]].vue';
 import { useGameStore } from '@/stores/game';
 import { GameIdNotFoundErrorResponse, UnexpectedErrorResponse } from '@/types/constants';
 
-import { Role } from '@/types/enums';
-
 import { waitFor } from '@tests/unit/setup/global';
 import { server, spyApi } from '@tests/unit/setup/api';
 import { mockT, setLocale } from '@tests/unit/setup/i18n';
@@ -112,7 +110,7 @@ describe('Join Game page', () => {
 			expect(spyGame).toHaveBeenCalledWith(responseData);
 			if (JSON.stringify(responseData).includes(name)) {
 				expect(spyPlayer).toHaveBeenCalledWith(
-					expect.objectContaining({ nickname: name, role: Role.VILLAGER })
+					expect.objectContaining({ nickname: name, roles: [] })
 				);
 			}
 
@@ -240,6 +238,9 @@ describe('Join Game page', () => {
 	it.each(['en', 'de'])(
 		'submits the form successfully for an instant admission',
 		async (locale: string) => {
+			const router = useRouter();
+			const spyPush = vi.spyOn(router, 'push');
+
 			const wrapper = await setupPage(
 				locale,
 				`/join/${stubGameInactive.id}?invite=${stubGameInactive.players[0].nickname}`
@@ -253,8 +254,7 @@ describe('Join Game page', () => {
 				200,
 				stubGameInactive
 			);
-			//TODO: Re-enable this when the page has been created (it won't fire until it does)
-			// expect(mockNavigate).toHaveBeenCalledWith(`/play/${stubGameInactive.id}`);
+			expect(spyPush).toHaveBeenCalledWith(`/play/${stubGameInactive.id}`);
 		}
 	);
 
