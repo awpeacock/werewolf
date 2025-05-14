@@ -1,10 +1,17 @@
 <script setup lang="ts">
-const props = defineProps<{
-	link: string;
-	label: string;
-	class: string;
-	disabled?: boolean;
-}>();
+const props = withDefaults(
+	defineProps<{
+		link: string;
+		label: string;
+		class?: string;
+		disabled?: boolean;
+		translate?: boolean;
+	}>(),
+	{
+		class: '',
+		translate: true,
+	}
+);
 defineOptions({
 	inheritAttrs: false,
 });
@@ -52,7 +59,7 @@ if (props.link.indexOf('?') !== -1) {
 				}
 			"
 		>
-			{{ $t(label) }}
+			{{ translate ? $t(label) : label }}
 		</button>
 	</NuxtLink>
 </template>

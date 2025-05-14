@@ -1,6 +1,7 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 
-let mockRetries: Nullable<number> = 5;
+let mockRetries: Undefinable<number> = 5;
+let mockMinPlayers: Undefinable<number> = 5;
 export const setupRuntimeConfigForApis = () => {
 	mockNuxtImport('useRuntimeConfig', () => {
 		return () => {
@@ -10,10 +11,16 @@ export const setupRuntimeConfigForApis = () => {
 				AWS_SECRET_ACCESS_KEY: 'AWS_SECRET_ACCESS_KEY',
 				AWS_DYNAMODB_TABLE: 'AWS_DYNAMODB_TABLE',
 				CREATE_MAX_RETRIES: mockRetries,
+				public: {
+					MIN_PLAYERS: mockMinPlayers?.toString(),
+				},
 			};
 		};
 	});
 };
-export const setMockRetries = (max: Nullable<number>) => {
+export const setMockRetries = (max: Undefinable<number>) => {
 	mockRetries = max;
+};
+export const setMockMinPlayers = (min: Undefinable<number>) => {
+	mockMinPlayers = min;
 };

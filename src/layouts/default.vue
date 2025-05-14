@@ -1,5 +1,7 @@
 <script setup lang="ts">
 const route = useRoute();
+const game = useGameStore();
+const player = usePlayerStore();
 
 const loaded = ref(false);
 const margin = computed(() => {
@@ -12,7 +14,20 @@ onMounted(() => {
 
 <template>
 	<div v-show="loaded" class="flex flex-col">
-		<div class="flex flex-row self-end">
+		<div class="flex flex-row justify-between w-full">
+			<a
+				v-if="useRoute().path !== '' && useRoute().path !== '/'"
+				href="/"
+				class="font-oswald text-white mt-3 ml-4"
+			>
+				&lsaquo; {{ $t('go-home') }}
+			</a>
+			<span v-if="player.id !== ''" class="mt-3">
+				<span class="font-oswald text-yellow-200 mr-2"
+					>{{ player.nickname }} ({{ $t(player.role) }})</span
+				>
+				<span class="font-oswald text-white mr-2">{{ game.id }}</span>
+			</span>
 			<Notifications />
 			<LocaleSwitcher />
 		</div>

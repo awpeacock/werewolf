@@ -1,3 +1,4 @@
+import { Role } from '@/types/enums';
 import { defineStore } from 'pinia';
 
 let config: boolean | object = false;
@@ -14,9 +15,26 @@ export const usePlayerStore = defineStore('player', {
 		nickname: '',
 		roles: [],
 	}),
+	getters: {
+		role(): string {
+			if (this.roles.includes(Role.WOLF)) {
+				return 'wolf';
+			} else if (this.roles.includes(Role.HEALER)) {
+				return 'healer';
+			} else {
+				return 'villager';
+			}
+		},
+	},
 	actions: {
 		set(player: Player) {
 			this.$patch(player);
+		},
+		addRole(role: Role) {
+			this.roles.push(role);
+		},
+		setRoles(roles: Role[]) {
+			this.roles = roles;
 		},
 	},
 	persist: config,

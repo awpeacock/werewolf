@@ -25,3 +25,6 @@ export const NicknameAlreadyExistsErrorResponse: APIErrorResponse = {
 export const PlayerAlreadyAdmittedErrorResponse: APIErrorResponse = {
 	errors: [{ message: 'Player already admitted to game' }],
 };
+export const NotEnoughPlayersErrorResponse: APIErrorResponse = {
+	errors: [{ message: 'Too few players added to game' }],
+};

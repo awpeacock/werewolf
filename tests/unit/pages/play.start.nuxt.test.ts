@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime';
+import { mountSuspended } from '@nuxt/test-utils/runtime';
 import { flushPromises, type VueWrapper } from '@vue/test-utils';
 import { http, HttpResponse } from 'msw';
+
+import { setMockMinPlayers, setupRuntimeConfigForApis } from '../setup/runtime';
 
 import page from '@/pages/play/[[id]].vue';
 import { GameIdNotFoundErrorResponse, UnauthorisedErrorResponse } from '@/types/constants';
@@ -9,6 +11,7 @@ import { Role } from '@/types/enums';
 
 import { waitFor } from '@tests/unit/setup/global';
 import { server, spyApi } from '@tests/unit/setup/api';
+import { mockGame } from '@tests/unit/setup/game';
 import { mockT, mockUseLocalePath, setLocale } from '@tests/unit/setup/i18n';
 import { mockNavigate, stubNuxtLink } from '@tests/unit/setup/navigation';
 import {
@@ -29,15 +32,9 @@ import {
 } from '@tests/unit/setup/stubs';
 import { mockWSLatest } from '@tests/unit/setup/websocket';
 
-const mockGame = {
-	getLatest: vi.fn().mockReturnValue(stubGameInactive),
-	parse: vi.fn().mockReturnValue(stubGameInactive),
-};
-mockNuxtImport('useGame', () => {
-	return () => mockGame;
-});
+setupRuntimeConfigForApis();
 
-describe('Play Game page', () => {
+describe('Play Game (Start Game) page', () => {
 	const storeGame = useGameStore();
 	const storePlayer = usePlayerStore();
 
@@ -131,7 +128,7 @@ describe('Play Game page', () => {
 		'should gracefully handle any error retrieving the latest state of the game',
 		async (locale: string) => {
 			const spyError = vi.spyOn(console, 'error').mockImplementation(() => null);
-			storeGame.$reset();
+			storeGame.set(structuredClone(stubGameInactive));
 			storePlayer.$reset();
 			mockGame.getLatest = vi.fn().mockImplementationOnce(() => {
 				throw new Error('Game error');
@@ -142,9 +139,7 @@ describe('Play Game page', () => {
 
 				expect(spyError).toBeCalled();
 				expect(wrapper.findComponent({ name: 'Error' }).exists()).toBeTruthy();
-				expect(wrapper.text()).toContain(
-					`you-must-come-here-with-a-valid-game-code (${locale})`
-				);
+				expect(wrapper.text()).toContain(`you-have-not-yet-joined (${locale})`);
 				expect(wrapper.findComponent({ name: 'Button' }).exists()).toBeTruthy();
 			}).not.toThrowError();
 		}
@@ -321,7 +316,6 @@ describe('Play Game page', () => {
 		async (locale: string) => {
 			storeGame.set(structuredClone(stubGameReady));
 			mockGame.getLatest = vi.fn().mockReturnValue(stubGameReady);
-			mockGame.parse = vi.fn().mockReturnValue(stubGameReady);
 			storePlayer.set(structuredClone(stubMayor));
 			const wrapper = await setupPage(locale, '/play/' + stubGameReady.id);
 
@@ -364,6 +358,21 @@ describe('Play Game page', () => {
 	it.each(['en', 'de'])(
 		'should not allow the mayor to click the "Start Game" button if the minimum number of players have not joined',
 		async (locale: string) => {
+			storeGame.set(stubGameInactive);
+			mockGame.getLatest = vi.fn().mockReturnValue(stubGameInactive);
+			storePlayer.set(stubMayor);
+			const wrapper = await setupPage(locale, '/play/' + stubGameInactive.id);
+
+			await triggerStart(wrapper, stubGameInactive.id, stubMayor, false);
+
+			expect(wrapper.text()).toContain(`welcome-to-lycanville (${locale})`);
+		}
+	);
+
+	it.each(['en', 'de'])(
+		'should not allow the mayor to click the "Start Game" button if the minimum number of players (unconfigured) have not joined',
+		async (locale: string) => {
+			setMockMinPlayers(undefined);
 			storeGame.set(stubGameInactive);
 			mockGame.getLatest = vi.fn().mockReturnValue(stubGameInactive);
 			storePlayer.set(stubMayor);

@@ -44,18 +44,33 @@ export default defineNitroPlugin((nitro) => {
 		// Update a game on the database
 		update: async (game: Game): Promise<void> => {
 			try {
+				let expression = 'SET Players = :players, Pending = :pending, Active = :active';
+				const values: {
+					[key: string]: Undefinable<Array<Player>> | boolean | string | Array<Activity>;
+				} = {
+					':players': game.players,
+					':pending': game.pending,
+					':active': game.active,
+				};
+				if (game.started) {
+					expression += ', Started = :started';
+					values[':started'] = (game.started as Date).toISOString();
+				}
+				if (game.stage) {
+					expression += ', Stage = :stage';
+					values[':stage'] = game.stage;
+				}
+				if (game.activities) {
+					expression += ', Activities = :activities';
+					values[':activities'] = game.activities;
+				}
 				const update = new UpdateCommand({
 					TableName: config.AWS_DYNAMODB_TABLE,
 					Key: {
 						Id: game.id,
 					},
-					UpdateExpression:
-						'SET Players = :players, Pending = :pending, Active = :active',
-					ExpressionAttributeValues: {
-						':players': game.players,
-						':pending': game.pending,
-						':active': game.active,
-					},
+					UpdateExpression: expression,
+					ExpressionAttributeValues: values,
 					ReturnValues: 'ALL_NEW',
 				});
 				await docClient.send(update);
@@ -83,6 +98,15 @@ export default defineNitroPlugin((nitro) => {
 						players: response.Item.Players,
 						pending: response.Item.Pending,
 					};
+					if (response.Item.Started) {
+						game.started = new Date(response.Item.Started);
+					}
+					if (response.Item.Stage) {
+						game.stage = response.Item.Stage;
+					}
+					if (response.Item.Activities) {
+						game.activities = response.Item.Activities;
+					}
 					return game;
 				}
 				return null;

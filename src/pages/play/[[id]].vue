@@ -9,25 +9,59 @@ definePageMeta({
 	},
 });
 
-type PlayState = 'initial' | 'selection' | 'day' | 'night' | 'vote' | 'completion' | 'invalid';
+type PlayState = 'initial' | 'selection' | 'day' | 'night' | 'completion' | 'invalid';
+
+const min = ref(6);
 
 const game = useGameStore();
+const player = usePlayerStore();
+const util = useGame(game);
 // We always want to be sure we're dealing with the latest state of the game (user might click "Play"
 // AFTER the mayor has started the game, for example)
 try {
 	const latest = await useGame(game).getLatest();
 	game.set(latest);
+	player.set(game.findPlayer(player.id) as Player);
 } catch (e) {
 	useLogger().error('Could not retrieve latest game state', e as Error);
 	// Lack of game in the session is handled with later checks, no need to do anything specific now
 }
-const player = usePlayerStore();
+const playable = computed(() => {
+	return game.players.length >= min.value;
+});
 const isMayor = computed(() => {
 	return game.mayor && player && game.mayor.id === player.id;
 });
-const playable = computed(() => {
-	return game.players.length >= 6;
+const isWolf = computed(() => {
+	return player && player.roles.includes(Role.WOLF);
 });
+const isHealer = computed(() => {
+	return player && player.roles.includes(Role.HEALER);
+});
+const isDead = computed(() => {
+	return useGame(game).isPlayerDead(player.id).value;
+});
+const hasDecided = computed(() => {
+	if (isWolf.value && activity.value) {
+		if (activity.value.wolf) {
+			return true;
+		}
+	}
+	if (isHealer.value && activity.value) {
+		if (activity.value.healer) {
+			return true;
+		}
+	}
+	return false;
+});
+const victim = computed(() => {
+	if (activity.value && activity.value.wolf) {
+		return game.findPlayer(activity.value.wolf)?.nickname;
+	}
+	return '';
+});
+const alive = util.getAlivePlayers();
+const dead = util.getDeadPlayers();
 const loading: Ref<boolean> = ref(false);
 const error: Ref<Nullable<string>> = ref(null);
 
@@ -50,6 +84,9 @@ if (code.value !== game.id) {
 		error.value = 'you-have-not-yet-joined';
 	}
 }
+const activity = computed(() => {
+	return useGame(game).getCurrentActivity();
+});
 
 // Prep the WebSocket client to handle all the game state updates
 const socket = useWebSocketClient();
@@ -71,6 +108,12 @@ const role = computed(() => {
 
 // Let's detect if we've got a player already in the process of joining
 onMounted(() => {
+	// Configurable values
+	const config = useRuntimeConfig().public.MIN_PLAYERS;
+	if (config) {
+		min.value = parseInt(config);
+	}
+
 	const player = usePlayerStore();
 	// If already invalidated, use the error already supplied
 	if (state.value !== 'invalid') {
@@ -89,7 +132,7 @@ onMounted(() => {
 // Start the game
 const start = async (event: MouseEvent) => {
 	event.preventDefault();
-	if (game.players.length >= 6) {
+	if (game.players.length >= min.value) {
 		loading.value = true;
 		const api = `/api/games/${code.value.toUpperCase()}/start`;
 		const body: StartGameBody = { auth: player.id };
@@ -111,16 +154,62 @@ const start = async (event: MouseEvent) => {
 			});
 	}
 };
+// Play the game (ie move it to night time so the wolf and healer pick)
+const play = async (event: MouseEvent) => {
+	event.preventDefault();
+	if (game.stage) {
+		state.value = game.stage;
+	} else {
+		state.value = 'night';
+	}
+};
+// Handle the choices of the wolf and the healer
+const choose = async (event: MouseEvent) => {
+	event.preventDefault();
+	const target: Player = game.findPlayer((event.target as HTMLButtonElement).innerText) as Player;
+	loading.value = true;
+	const api = `/api/games/${code.value.toUpperCase()}/night`;
+	const body: ActivityBody = {
+		role: isWolf.value ? Role.WOLF : Role.HEALER,
+		player: player.id,
+		target: target.id,
+	};
+	$fetch<Game>(api, {
+		method: 'PUT',
+		body: body,
+	})
+		.then((response: Game) => {
+			game.set(useGame(response).parse());
+			loading.value = false;
+		})
+		.catch((e) => {
+			loading.value = false;
+
+			if (e.status === 404) {
+				error.value = 'game-not-found';
+			} else {
+				error.value = 'unexpected-error';
+			}
+		});
+};
 
 watch(
 	() => socket.latest.value,
 	(event) => {
-		if (state.value === 'initial' && event) {
-			if (event.type === 'start-game') {
-				const start = event as StartGameEvent;
-				player.roles.push(start.role);
-				state.value = 'selection';
+		if (event) {
+			if (state.value === 'initial') {
+				if (event.type === 'start-game') {
+					const start = event as StartGameEvent;
+					player.addRole(start.role);
+					state.value = 'selection';
+				}
 			}
+			if (state.value === 'night') {
+				if (event.type === 'morning') {
+					state.value = 'day';
+				}
+			}
+			game.set(event.game);
 		}
 	}
 );
@@ -128,6 +217,10 @@ watch(
 
 <template>
 	<div>
+		<Heading v-if="state === 'day' || state === 'night'" class="text-center uppercase">
+			{{ $t(state + '-time') }}
+			<Population :alive="alive" :dead="dead" />
+		</Heading>
 		<Error v-if="error" :message="error" />
 		<div v-if="state === 'invalid'">
 			<BodyText>{{ $t('return-and-start-again') }}</BodyText>
@@ -140,21 +233,8 @@ watch(
 			<BodyText>{{ $t('story-introduction-3') }}</BodyText>
 			<BodyText>{{ $t('story-introduction-4') }}</BodyText>
 			<BodyText>{{ $t('story-introduction-5') }}</BodyText>
-			<div>
-				<Heading class="border rounded border-yellow-200 mx-20 p-2 text-center"
-					>{{ $t('population') }} : {{ game.players.length }}</Heading
-				>
-			</div>
-			<ul class="border rounded border-white mx-20 mb-4 p-2 text-center">
-				<li
-					v-for="(villager, idx) in game.players"
-					:key="idx"
-					class="font-oswald text-base text-white"
-				>
-					{{ villager.nickname }}
-				</li>
-			</ul>
-			<BodyText v-if="isMayor">{{ $t('must-have-min-players', { min: 6 }) }}</BodyText>
+			<BodyText v-if="isMayor">{{ $t('must-have-min-players', { min: min }) }}</BodyText>
+			<Population :alive="alive" :dead="dead" />
 			<Button
 				v-if="isMayor"
 				link=""
@@ -172,6 +252,52 @@ watch(
 			<h3 class="mb-4 font-oswald text-center text-6xl text-yellow-200">
 				{{ $t(role).toUpperCase() }}
 			</h3>
+			<Button link="" label="play" class="w-full" @click="play" />
+		</div>
+		<div v-if="state === 'night'">
+			<BodyText>{{ $t('night-descends') }}</BodyText>
+			<div v-if="isWolf || isHealer">
+				<div v-if="hasDecided">
+					<BodyText>{{
+						$t('you-have-chosen', { wait: isWolf ? 'the healer' : 'the wolf' })
+					}}</BodyText>
+					<BouncingDots />
+				</div>
+				<div v-else>
+					<BodyText>{{ $t(`make-your-decision-${role}`) }}</BodyText>
+					<div class="grid grid-cols-3 gap-4">
+						<Button
+							v-for="(villager, idx) in game.players.filter(
+								(p) => p.id !== player.id
+							)"
+							:key="idx"
+							link=""
+							:label="villager.nickname"
+							:translate="false"
+							class="w-full"
+							@click="choose"
+						/>
+					</div>
+				</div>
+			</div>
+			<div v-else>
+				<BodyText>{{ $t('we-wait') }}</BodyText>
+				<BouncingDots />
+			</div>
+		</div>
+		<div v-if="state === 'day'">
+			<BodyText v-if="activity.wolf === activity.healer">
+				{{ $t('activity-summary-saved') }}
+			</BodyText>
+			<BodyText v-else>
+				{{
+					$t('activity-summary-not-saved', {
+						victim: victim,
+					})
+				}}
+			</BodyText>
+			<BodyText v-if="!isDead">{{ $t('time-for-the-village-to-vote') }}</BodyText>
+			<BodyText v-else>{{ $t('you-cannot-vote-as-you-are-dead') }}</BodyText>
 		</div>
 	</div>
 </template>

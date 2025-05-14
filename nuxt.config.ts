@@ -42,6 +42,9 @@ export default defineNuxtConfig({
 		AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
 		AWS_DYNAMODB_TABLE: process.env.AWS_DYNAMODB_TABLE,
 		CREATE_MAX_RETRIES: process.env.CREATE_MAX_RETRIES,
+		public: {
+			MIN_PLAYERS: process.env.MIN_PLAYERS,
+		},
 	},
 	rootDir: path.resolve(__dirname),
 	srcDir: 'src/',

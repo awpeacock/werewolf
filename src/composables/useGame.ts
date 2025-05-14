@@ -55,6 +55,42 @@ export const useGame = (game: Game) => {
 		return false;
 	};
 
+	const isPlayerDead = (identifier: string): Ref<boolean> =>
+		computed(() => {
+			if (!game.activities) {
+				return false;
+			}
+			const player = findPlayer(identifier);
+			for (const activity of game.activities) {
+				if (activity.wolf && activity.healer && activity.wolf !== activity.healer) {
+					if (player?.id === activity.wolf || player?.nickname === activity.wolf) {
+						return true;
+					}
+				}
+			}
+			return false;
+		});
+
+	const getDeadPlayers = (): Ref<Array<Player>> =>
+		computed(() => {
+			if (!game.activities) {
+				return [];
+			}
+			const players: Array<Player> = [];
+			for (const activity of game.activities) {
+				if (activity.wolf && activity.healer && activity.wolf !== activity.healer) {
+					players.push(findPlayer(activity.wolf)!);
+				}
+			}
+			return players;
+		});
+
+	const getAlivePlayers = (): Ref<Array<Player>> =>
+		computed(() => {
+			const dead = new Set(getDeadPlayers().value);
+			return game.players.filter((player) => !dead.has(player));
+		});
+
 	const admitPlayer = (identifier: string): Game => {
 		if (!game.pending) {
 			throw new Error('Attempt to admit player from an empty pending list');
@@ -84,6 +120,22 @@ export const useGame = (game: Game) => {
 		throw new Error('Attempt to remove player that is not on pending list');
 	};
 
+	const getCurrentActivity = (): Activity => {
+		if (!game.activities || game.activities.length == 0) {
+			return { wolf: null, healer: null, votes: [] };
+		}
+		const latest: Activity = game.activities.at(-1)!;
+		if (
+			latest!.wolf === null ||
+			latest!.healer === null ||
+			latest!.votes === undefined ||
+			latest!.votes?.length < getAlivePlayers().value.length
+		) {
+			return latest;
+		}
+		return { wolf: null, healer: null, votes: [] };
+	};
+
 	return {
 		parse,
 		getLatest,
@@ -91,7 +143,11 @@ export const useGame = (game: Game) => {
 		findPlayer,
 		hasPlayer,
 		isPlayerAdmitted,
+		isPlayerDead,
+		getDeadPlayers,
+		getAlivePlayers,
 		admitPlayer,
 		removePlayer,
+		getCurrentActivity,
 	};
 };

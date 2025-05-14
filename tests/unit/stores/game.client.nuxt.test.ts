@@ -58,6 +58,8 @@ describe('Game Pinia Store', () => {
 		// inject an empty one
 		const expected = structuredClone(stubGameNew);
 		expected.pending = [];
+		expected.stage = undefined;
+		expected.activities = [];
 
 		expect(store.$state).toEqual(expected);
 		expect(sessionStorage.setItem).toBeCalled();

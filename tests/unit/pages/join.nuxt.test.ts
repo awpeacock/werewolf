@@ -117,7 +117,7 @@ describe('Join Game page', () => {
 			const data: Game = responseData as Game;
 			const game: Game = useGameStore().$state;
 			if (data.pending !== undefined) {
-				expect(game).toEqual(responseData);
+				expect(game).toMatchObject(responseData);
 			} else {
 				expect(game).toEqual(
 					expect.objectContaining({

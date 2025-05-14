@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 
-import { stubVillager1 } from '@tests/unit/setup/stubs';
+import { stubHealer, stubVillager1, stubVillager6, stubWolf } from '@tests/unit/setup/stubs';
+import { Role } from '@/types/enums';
 
 mockNuxtImport('useEnvironment', () => {
 	return () => {
@@ -36,5 +37,32 @@ describe('Player Pinia Store', () => {
 		expect(store.$state).toEqual(stubVillager1);
 		expect(sessionStorage.setItem).toBeCalled();
 		expect(sessionStorage.getItem('player')!).toEqual(JSON.stringify(stubVillager1));
+	});
+
+	it('should successfully add a role to a player', async () => {
+		store.set(stubVillager1);
+
+		store.addRole(Role.VILLAGER);
+		expect(store.roles).toContain(Role.VILLAGER);
+	});
+
+	it('should successfully set all roles for a player', async () => {
+		store.set(stubVillager1);
+
+		const roles = [Role.MAYOR, Role.WOLF];
+		store.setRoles(roles);
+
+		expect(store.roles).toEqual(roles);
+	});
+
+	it('should return the designated role of a player', async () => {
+		const players = [stubVillager6, stubWolf, stubHealer];
+		const roles = ['villager', 'wolf', 'healer'];
+		for (let p = 0; p < players.length; p++) {
+			store.set(players[p]);
+
+			expect(store.$state).toEqual(players[p]);
+			expect(store.role).toEqual(roles[p]);
+		}
 	});
 });

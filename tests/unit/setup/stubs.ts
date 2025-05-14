@@ -61,6 +61,41 @@ export const stubHealer: Player = {
 	roles: [Role.HEALER],
 };
 
+export const stubVotes1: Array<Vote> = [
+	{ stubVillager6: stubVillager8.id },
+	{ stubVillager8: stubVillager6.id },
+	{ stubMayor: stubVillager6.id },
+	{ stubWolf: stubVillager6.id },
+	{ stubHealer: stubVillager6.id },
+];
+
+export const stubActivityBlank: Activity = {
+	wolf: null,
+	healer: null,
+	votes: [],
+};
+export const stubActivitySaved1: Activity = {
+	wolf: stubVillager6.id,
+	healer: stubVillager6.id,
+};
+export const stubActivitySaved2: Activity = {
+	wolf: stubVillager6.id,
+	healer: stubVillager6.id,
+};
+export const stubActivityNotSaved1: Activity = {
+	wolf: stubVillager6.id,
+	healer: stubVillager7.id,
+};
+export const stubActivityNotSaved2: Activity = {
+	wolf: stubVillager8.id,
+	healer: stubVillager7.id,
+};
+export const stubActivityVoted1: Activity = {
+	wolf: stubVillager8.id,
+	healer: stubVillager7.id,
+	votes: stubVotes1,
+};
+
 export const stubGameIdPutError = 'PUTF';
 export const stubGameIdDuplicateError = 'DUPE';
 export const stubGameIdUpdateError = 'UPDF';
@@ -91,18 +126,37 @@ export const stubGameInactive: Game = {
 	created: new Date(),
 	active: false,
 	players: [stubMayor, stubVillager1],
+	activities: [],
 };
 export const stubGameReady: Game = {
 	id: 'G7H8',
 	created: new Date(),
 	active: false,
 	players: [stubMayor, stubVillager1, stubVillager2, stubVillager3, stubVillager4, stubVillager5],
+	activities: [],
 };
 export const stubGameActive: Game = {
 	id: 'I9J0',
 	created: new Date(),
+	started: new Date(),
+	active: true,
+	stage: 'night',
+	players: [stubMayor, stubVillager6, stubVillager7, stubVillager8, stubWolf, stubHealer],
+	activities: [],
+};
+export const stubGameIncompleteActivity: Game = {
+	id: 'K0L9',
+	created: new Date(),
 	active: true,
 	players: [stubMayor, stubVillager6, stubVillager7, stubVillager8, stubWolf, stubHealer],
+	activities: [stubActivityNotSaved1],
+};
+export const stubGameCompleteActivity: Game = {
+	id: 'M8N7',
+	created: new Date(),
+	active: true,
+	players: [stubMayor, stubVillager6, stubVillager7, stubVillager8, stubWolf, stubHealer],
+	activities: [stubActivityVoted1],
 };
 export const stubGamePutFailure: Game = {
 	id: stubGameIdPutError,
@@ -114,7 +168,7 @@ export const stubGameUpdateFailure: Game = {
 	id: stubGameIdUpdateError,
 	created: new Date(),
 	active: false,
-	players: [stubMayor],
+	players: [stubMayor, stubWolf, stubHealer, stubVillager6, stubVillager7, stubVillager8],
 	pending: [stubVillager1],
 };
 

@@ -9,6 +9,19 @@ import {
 	stubGameInactive,
 	stubVillager1,
 	stubVillager2,
+	stubGameActive,
+	stubVillager6,
+	stubVillager7,
+	stubVillager8,
+	stubHealer,
+	stubWolf,
+	stubActivityNotSaved1,
+	stubActivitySaved1,
+	stubActivityNotSaved2,
+	stubActivitySaved2,
+	stubActivityBlank,
+	stubGameIncompleteActivity,
+	stubGameCompleteActivity,
 } from '@tests/unit/setup/stubs';
 
 describe('useGame', () => {
@@ -171,6 +184,114 @@ describe('useGame', () => {
 		expect(exists).toBeFalsy();
 	});
 
+	it('should successfully return false if no player exists when checking if admitted (based on ID)', () => {
+		const game: Game = structuredClone(stubGamePending);
+		const exists: boolean = useGame(game).isPlayerAdmitted(stubVillager2.id);
+		expect(exists).toBeFalsy();
+	});
+
+	it('should successfully return true if a player is dead (based on nickname)', () => {
+		const game: Game = structuredClone(stubGameActive);
+		game.activities?.push({ wolf: stubVillager6.id, healer: stubVillager7.id, votes: [] });
+		const dead: boolean = useGame(game).isPlayerDead(stubVillager6.nickname).value;
+		expect(dead).toBeTruthy();
+	});
+
+	it('should successfully return true if a player is dead (based on ID)', () => {
+		const game: Game = structuredClone(stubGameActive);
+		game.activities?.push({ wolf: stubVillager6.id, healer: stubVillager7.id, votes: [] });
+		const dead: boolean = useGame(game).isPlayerDead(stubVillager6.id).value;
+		expect(dead).toBeTruthy();
+	});
+
+	it('should successfully return false if a player is not dead due to no activity (based on nickname)', () => {
+		const game: Game = structuredClone(stubGameActive);
+		game.activities = undefined;
+		const dead: boolean = useGame(game).isPlayerDead(stubVillager6.nickname).value;
+		expect(dead).toBeFalsy();
+	});
+
+	it('should successfully return false if a player is not dead due to no activity (based on ID)', () => {
+		const game: Game = structuredClone(stubGameActive);
+		game.activities = undefined;
+		const dead: boolean = useGame(game).isPlayerDead(stubVillager6.id).value;
+		expect(dead).toBeFalsy();
+	});
+
+	it('should successfully return false if a player is not dead when not attacked (based on nickname)', () => {
+		const game: Game = structuredClone(stubGameActive);
+		game.activities?.push(stubActivityNotSaved1);
+		const dead: boolean = useGame(game).isPlayerDead(stubVillager8.nickname).value;
+		expect(dead).toBeFalsy();
+	});
+
+	it('should successfully return false if a player is not dead when not attacked (based on ID)', () => {
+		const game: Game = structuredClone(stubGameActive);
+		game.activities?.push(stubActivityNotSaved1);
+		const dead: boolean = useGame(game).isPlayerDead(stubVillager8.id).value;
+		expect(dead).toBeFalsy();
+	});
+
+	it('should successfully return false if a player is not dead, when saved (based on nickname)', () => {
+		const game: Game = structuredClone(stubGameActive);
+		game.activities?.push({ wolf: stubVillager6.id, healer: stubVillager6.id, votes: [] });
+		const dead: boolean = useGame(game).isPlayerDead(stubVillager6.nickname).value;
+		expect(dead).toBeFalsy();
+	});
+
+	it('should successfully return false if a player is not dead, when saved (based on ID)', () => {
+		const game: Game = structuredClone(stubGameActive);
+		game.activities?.push(stubActivitySaved1);
+		const dead: boolean = useGame(game).isPlayerDead(stubVillager6.id).value;
+		expect(dead).toBeFalsy();
+	});
+
+	it('should successfully retrieve a list of all the dead players for a game', () => {
+		const game: Game = structuredClone(stubGameActive);
+		game.activities?.push(stubActivityNotSaved1);
+		game.activities?.push(stubActivitySaved2);
+		game.activities?.push(stubActivityNotSaved2);
+		const dead: Array<Player> = useGame(game).getDeadPlayers().value;
+		expect(dead).toEqual([stubVillager6, stubVillager8]);
+	});
+
+	it('should successfully retrieve an empty list of dead players for an unstarted game', () => {
+		const game: Game = structuredClone(stubGameActive);
+		game.activities = undefined;
+		const dead: Array<Player> = useGame(game).getDeadPlayers().value;
+		expect(dead).toEqual([]);
+	});
+
+	it('should successfully retrieve an empty list of dead players for a game with a saved vilager', () => {
+		const game: Game = structuredClone(stubGameInactive);
+		game.activities?.push(stubActivitySaved1);
+		const dead: Array<Player> = useGame(game).getDeadPlayers().value;
+		expect(dead).toEqual([]);
+	});
+
+	it('should successfully retrieve a list of all the remaining live players for a game', () => {
+		const game: Game = structuredClone(stubGameActive);
+		game.activities?.push(stubActivityNotSaved1);
+		game.activities?.push(stubActivitySaved2);
+		game.activities?.push(stubActivityNotSaved2);
+		const live: Array<Player> = useGame(game).getAlivePlayers().value;
+		expect(live).toEqual([stubMayor, stubVillager7, stubWolf, stubHealer]);
+	});
+
+	it('should successfully retrieve a full list of alive players for an unstarted game', () => {
+		const game: Game = structuredClone(stubGameInactive);
+		game.activities = undefined;
+		const live: Array<Player> = useGame(game).getAlivePlayers().value;
+		expect(live).toEqual(stubGameInactive.players);
+	});
+
+	it('should successfully retrieve a full list of alive players for a game with a saved vilager', () => {
+		const game: Game = structuredClone(stubGameActive);
+		game.activities?.push(stubActivitySaved1);
+		const live: Array<Player> = useGame(game).getAlivePlayers().value;
+		expect(live).toEqual(stubGameActive.players);
+	});
+
 	it('should successfully move a player from pending to the players array', () => {
 		const game: Game = structuredClone(stubGamePending);
 		const admitted = useGame(game).admitPlayer(stubVillager1.id);
@@ -213,5 +334,30 @@ describe('useGame', () => {
 		expect(() => {
 			useGame(game).removePlayer(stubVillager2.id);
 		}).toThrowError('Attempt to remove player that is not on pending list');
+	});
+
+	it('should return the correct latest activity for an active game with only one', () => {
+		const game: Game = structuredClone(stubGameIncompleteActivity);
+		const activity: Activity = useGame(game).getCurrentActivity();
+		expect(activity).toEqual(stubActivityNotSaved1);
+	});
+
+	it('should return an empty Activity as the latest for an inactive game', () => {
+		const game: Game = structuredClone(stubGameInactive);
+		game.activities = undefined;
+		const activity: Activity = useGame(game).getCurrentActivity();
+		expect(activity).toEqual(stubActivityBlank);
+	});
+
+	it('should return an empty Activity as the latest for an active game', () => {
+		const game: Game = structuredClone(stubGameActive);
+		const activity: Activity = useGame(game).getCurrentActivity();
+		expect(activity).toEqual(stubActivityBlank);
+	});
+
+	it('should return an empty Activity as the latest for an active game with a completed activity', () => {
+		const game: Game = structuredClone(stubGameCompleteActivity);
+		const activity: Activity = useGame(game).getCurrentActivity();
+		expect(activity).toEqual(stubActivityBlank);
 	});
 });

@@ -10,6 +10,7 @@ import {
 	GameIdNotFoundErrorResponse,
 	InvalidActionErrorResponse,
 	NicknameAlreadyExistsErrorResponse,
+	NotEnoughPlayersErrorResponse,
 	PlayerAlreadyAdmittedErrorResponse,
 	PlayerIdNotFoundErrorResponse,
 	UnauthorisedErrorResponse,
@@ -126,13 +127,20 @@ export default defineEventHandler(
 			const body: StartGameBody = await readBody(event);
 
 			const gameUtil = useGame(game);
-			// Only the mayor can admit players
+			// Only the mayor can start the game
 			const mayor = gameUtil.mayor();
 			if (mayor?.id !== body.auth) {
 				setResponseStatus(event, 403);
 				return UnauthorisedErrorResponse;
 			}
+			// Must have minimum number of players
+			const min = parseInt(useRuntimeConfig().public.MIN_PLAYERS);
+			if (game.players.length < min) {
+				setResponseStatus(event, 400);
+				return NotEnoughPlayersErrorResponse;
+			}
 			game.active = true;
+			game.started = new Date();
 
 			// Assign the wolf and healer roles
 			const wolf = Math.floor(Math.random() * game.players.length);
@@ -170,6 +178,50 @@ export default defineEventHandler(
 			return game;
 		};
 
+		// Handler to start the game
+		const handleNight = async (game: Game) => {
+			const body: ActivityBody = await readBody(event);
+
+			const gameUtil = useGame(game);
+			// Get the latest activity to add to it
+			const activity = gameUtil.getCurrentActivity();
+			const isNew = activity.wolf === null && activity.healer === null;
+
+			// Make sure the player ID matches up to the role
+			const player = gameUtil.findPlayer(body.player);
+			if (player?.roles.includes(Role.WOLF) && body.role === Role.WOLF) {
+				activity.wolf = gameUtil.findPlayer(body.target)!.id;
+			} else if (player?.roles.includes(Role.HEALER) && body.role === Role.HEALER) {
+				activity.healer = gameUtil.findPlayer(body.target)!.id;
+			} else {
+				setResponseStatus(event, 403);
+				return UnauthorisedErrorResponse;
+			}
+
+			if (isNew) {
+				if (!game.activities) {
+					game.activities = [];
+				}
+				game.activities?.push(activity);
+			}
+
+			// If both the wolf and healer have now completed their activities,
+			// we need to broadcast the move on to daytime
+			if (activity.wolf !== null && activity.healer !== null) {
+				game.stage = 'day';
+				const broadcast = useWebSocketBroadcast();
+				const payload: MorningEvent = {
+					type: 'morning',
+					game: game,
+				};
+				broadcast.send({ game: game.id }, payload);
+			}
+			const dynamo: DynamoDBWrapper = useDynamoDB(event);
+			await dynamo.update(game);
+			setResponseStatus(event, 200);
+			return game;
+		};
+
 		try {
 			const id = getRouterParam(event, 'id');
 			const errors: Array<APIError> = useValidation().validateCode(id);
@@ -192,14 +244,11 @@ export default defineEventHandler(
 					case 'start': {
 						return await handleStart(game);
 					}
-					// case 'night': {
-					// 	return await handleNight(game);
-					// }
+					case 'night': {
+						return await handleNight(game);
+					}
 					// case 'day': {
 					// 	return await handleDay(game);
-					// }
-					// case 'vote': {
-					// 	return await handleVote(game);
 					// }
 					// case 'end': {
 					// 	return await handleEnd(game);

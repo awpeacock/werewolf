@@ -137,9 +137,9 @@ describe('Admit API (PUT)', async () => {
 	it('should not throw an error admitting a player already admitted', async () => {
 		stubParameters(stubGameInactive.id, true, stubMayor.id, stubVillager1.id, true);
 
-		const response = await handler.default(event);
+		const response: Game = (await handler.default(event)) as Game;
 		expect(response).not.toBeNull();
-		expect(response).toEqual(stubGameInactive);
+		expect(response.players).toMatchObject(stubGameInactive.players);
 		expect(mockResponseStatus).toBeCalledWith(event, 200);
 	});
 

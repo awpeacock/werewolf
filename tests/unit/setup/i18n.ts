@@ -13,7 +13,13 @@ export const mockUseI18n = {
 	defaultLocale: 'en',
 	locales: [{ code: 'en' } as LocaleObject, { code: 'de' } as LocaleObject],
 	localeCodes: ref(['en', 'de']),
-	t: vi.fn((key: string) => key + ' (en)'),
+	t: vi.fn((key: string, params?: Record<string, string>) => {
+		let translated = key;
+		for (const param in params) {
+			translated = translated + ' {' + param + ': ' + params[param] + '} ';
+		}
+		return translated + ' (en)';
+	}),
 };
 mockNuxtImport('useI18n', () => {
 	return () => mockUseI18n;
@@ -21,9 +27,17 @@ mockNuxtImport('useI18n', () => {
 export const setLocale = (locale: string): void => {
 	mockUseI18n.locale = locale;
 	mockUseI18n.defaultLocale = locale;
-	mockUseI18n.t = vi.fn((key: string) => `${key} (${locale})`);
+	mockUseI18n.t = vi.fn((key: string, params?: Record<string, string>) => {
+		let translated = key;
+		for (const param in params) {
+			translated = translated + ' {' + param + ': ' + params[param] + '} ';
+		}
+		return `${translated} (${locale})`;
+	});
 };
-export const mockT = vi.fn((key: string) => mockUseI18n.t(key));
+export const mockT = vi.fn((key: string, params?: Record<string, string>) =>
+	mockUseI18n.t(key, params)
+);
 
 export const mockUseLocalePath = vi.fn((path) => {
 	return path;

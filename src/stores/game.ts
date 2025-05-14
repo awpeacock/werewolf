@@ -15,21 +15,23 @@ export const useGameStore = defineStore('game', {
 		id: '',
 		created: new Date(),
 		active: false,
+		stage: undefined,
 		players: [],
 		pending: [],
+		activities: [],
 	}),
 	actions: {
 		set(game: Game) {
 			this.$patch(game);
 		},
-		findPlayer(nickname: string): Nullable<Player> {
-			return useGame(this).findPlayer(nickname);
+		findPlayer(identifier: string): Nullable<Player> {
+			return useGame(this).findPlayer(identifier);
 		},
-		hasPlayer(nickname: string): boolean {
-			return useGame(this).hasPlayer(nickname);
+		hasPlayer(identifier: string): boolean {
+			return useGame(this).hasPlayer(identifier);
 		},
-		isPlayerAdmitted(nickname: string): boolean {
-			return useGame(this).isPlayerAdmitted(nickname);
+		isPlayerAdmitted(identifier: string): boolean {
+			return useGame(this).isPlayerAdmitted(identifier);
 		},
 	},
 	getters: {

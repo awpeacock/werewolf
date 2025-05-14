@@ -6,6 +6,7 @@ import DefaultLayout from '@/layouts/default.vue';
 
 import { mockT } from '@tests/unit/setup/i18n';
 import { stubNuxtLink } from '@tests/unit/setup/navigation';
+import { stubGameActive, stubWolf } from '@tests/unit/setup/stubs';
 
 describe('Default layout', async () => {
 	it('should mount successfully, delaying loading', async () => {
@@ -50,5 +51,37 @@ describe('Default layout', async () => {
 		await wrapper.vm.$router.push('/create');
 		await flushPromises();
 		expect(wrapper.find('main').classes('max-sm:mb-[250px]')).toBeTruthy();
+	});
+
+	it('should mount successfully with a player in session', async () => {
+		const game = useGameStore();
+		game.set(stubGameActive);
+		const player = usePlayerStore();
+		player.set(stubWolf);
+
+		const wrapper = await mountSuspended(DefaultLayout, {
+			global: {
+				mocks: {
+					$t: mockT,
+				},
+				stubs: {
+					NuxtLink: stubNuxtLink,
+				},
+			},
+		});
+
+		await wrapper.vm.$router.push('/');
+		await flushPromises();
+
+		let bar = wrapper.find('.justify-between');
+		expect(bar.find('a').exists()).toBeFalsy();
+		expect(bar.text()).toContain(`${stubWolf.nickname} (wolf (en))`);
+		expect(bar.text()).toContain(game.id);
+
+		await wrapper.vm.$router.push('/join');
+		await flushPromises();
+
+		bar = wrapper.find('.justify-between');
+		expect(bar.find('a').exists()).toBeTruthy();
 	});
 });

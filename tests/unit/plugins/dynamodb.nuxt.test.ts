@@ -5,6 +5,8 @@ import type { H3Event, EventHandlerRequest } from 'h3';
 
 import { mockDynamoGet, mockDynamoPut, mockDynamoUpdate } from '@tests/unit/setup/dynamodb';
 import {
+	stubActivityVoted1,
+	stubGameActive,
 	stubGameIdGetError,
 	stubGameIdNotFound,
 	stubGameInactive,
@@ -78,7 +80,7 @@ describe('DynamoDB Nitro Plugin', async () => {
 		}).not.toThrow();
 	});
 
-	it('should generate a DynamoDB wrapper to update the database', async () => {
+	it('should generate a DynamoDB wrapper to update the database with an inactive game', async () => {
 		const dynamo: DynamoDBWrapper = event.context.dynamo;
 
 		expect(async () => {
@@ -94,6 +96,30 @@ describe('DynamoDB Nitro Plugin', async () => {
 			);
 			const args = mockDynamoUpdate.mock.calls[0][0];
 			expect(args.Key.Id).toBe(stubGameInactive.id);
+		}).not.toThrow();
+	});
+
+	it('should generate a DynamoDB wrapper to update the database with an active game', async () => {
+		const dynamo: DynamoDBWrapper = event.context.dynamo;
+
+		expect(async () => {
+			const game = structuredClone(stubGameActive);
+			game.activities!.push(stubActivityVoted1);
+			await dynamo.update(game);
+			expect(mockDynamoUpdate).toHaveBeenCalled();
+			expect(mockDynamoUpdate).toHaveBeenCalledWith(
+				expect.objectContaining({
+					TableName: expect.any(String),
+					ExpressionAttributeValues: expect.objectContaining({
+						':started': (stubGameActive.started as Date).toISOString(),
+						':stage': stubGameActive.stage,
+						':players': stubGameActive.players,
+						':activities': [stubActivityVoted1],
+					}),
+				})
+			);
+			const args = mockDynamoUpdate.mock.calls[0][0];
+			expect(args.Key.Id).toBe(stubGameActive.id);
 		}).not.toThrow();
 	});
 
@@ -114,6 +140,21 @@ describe('DynamoDB Nitro Plugin', async () => {
 
 			expect(game.active).toBeFalsy();
 			expect(game.players).toEqual(stubGameNew.players);
+
+			const active: Game = (await dynamo.get(stubGameActive.id)) as Game;
+			expect(mockDynamoGet).toHaveBeenCalled();
+			expect(mockDynamoGet).toHaveBeenCalledWith(
+				expect.objectContaining({
+					TableName: expect.any(String),
+					Key: { Id: stubGameActive.id },
+				})
+			);
+
+			expect(active.started).toEqual(stubGameActive.started);
+			expect(active.active).toBeTruthy();
+			expect(active.players).toEqual(stubGameActive.players);
+			expect(active.stage).toEqual(stubGameActive.stage);
+			expect(active.activities).toEqual(stubGameActive.activities);
 
 			const pending = await dynamo.get(stubGamePending.id);
 			expect(pending!.pending).toEqual(stubGamePending.pending);

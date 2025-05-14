@@ -11,7 +11,7 @@ describe('Button', async () => {
 		vi.clearAllMocks();
 	});
 
-	it.each(['en', 'de'])('should mount successfully', async (locale: string) => {
+	it.each(['en', 'de'])('should mount successfully (enabled)', async (locale: string) => {
 		const link = '/create';
 		const label = 'label';
 		const clazz = 'w-full';
@@ -39,6 +39,7 @@ describe('Button', async () => {
 		expect(button.text()).toEqual(`${label} (${locale})`);
 		expect(button.attributes('role')).toEqual('link');
 		expect(button.attributes('class')).toContain('w-full');
+		expect(button.attributes('class')).toContain('bg-yellow-600');
 
 		const path = locale == 'en' ? link : '/' + locale + link;
 		const stub = wrapper.find('[data-test-link]');
@@ -47,6 +48,74 @@ describe('Button', async () => {
 		await button.trigger('click');
 		expect(mockNavigate).toHaveBeenCalled();
 		expect(mockUseLocalePath).toHaveBeenCalledWith(link);
+	});
+
+	it.each(['en', 'de'])('should mount successfully (disabled)', async (locale: string) => {
+		const link = '/create';
+		const label = 'label';
+		const clazz = 'w-full';
+
+		setLocalePath(locale);
+
+		const wrapper = await mountSuspended(Button, {
+			props: {
+				link: link,
+				label: label,
+				class: clazz,
+				disabled: true,
+			},
+			global: {
+				mocks: {
+					$t: mockT,
+				},
+				stubs: {
+					NuxtLink: stubNuxtLink,
+				},
+			},
+		});
+
+		const button = wrapper.find('button');
+		expect(button).not.toBeNull();
+		expect(button.text()).toEqual(`${label} (${locale})`);
+		expect(button.attributes('role')).toEqual('link');
+		expect(button.attributes('class')).toContain('w-full');
+		expect(button.attributes('class')).toContain('bg-stone-400');
+
+		const path = locale == 'en' ? link : '/' + locale + link;
+		const stub = wrapper.find('[data-test-link]');
+		expect(stub.attributes('data-to')).toContain(path);
+
+		await button.trigger('click');
+		expect(mockNavigate).toHaveBeenCalled();
+		expect(mockUseLocalePath).toHaveBeenCalledWith(link);
+	});
+
+	it.each(['en', 'de'])('should mount successfully (untranslated)', async (locale: string) => {
+		const link = '/';
+		const label = 'This is my label';
+		const clazz = 'w-full';
+
+		setLocalePath(locale);
+
+		const wrapper = await mountSuspended(Button, {
+			props: {
+				link: link,
+				label: label,
+				class: clazz,
+				translate: false,
+			},
+			global: {
+				mocks: {
+					$t: mockT,
+				},
+				stubs: {
+					NuxtLink: stubNuxtLink,
+				},
+			},
+		});
+
+		expect(wrapper.text()).toContain('This is my label');
+		expect(wrapper.text()).not.toContain(`(${locale})`);
 	});
 
 	it.each(['en', 'de'])(

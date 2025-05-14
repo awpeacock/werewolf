@@ -3,6 +3,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	GameIdNotFoundErrorResponse,
 	InvalidActionErrorResponse,
+	NotEnoughPlayersErrorResponse,
 	UnauthorisedErrorResponse,
 	UnexpectedErrorResponse,
 } from '@/types/constants';
@@ -146,6 +147,15 @@ describe('Start API (PUT)', async () => {
 		expect(mockResponseStatus).toBeCalledWith(event, 403);
 	});
 
+	it('should reject any request where the game does not have enough players', async () => {
+		stubParameters(stubGameInactive.id, true, stubMayor.id);
+
+		const response = await handler.default(event);
+		expect(response).not.toBeNull();
+		expect(response).toEqual(NotEnoughPlayersErrorResponse);
+		expect(mockResponseStatus).toBeCalledWith(event, 400);
+	});
+
 	it('should return an ErrorResponse (with validation messages) if the code is invalid', async () => {
 		const codes = [
 			null,
@@ -214,7 +224,6 @@ describe('Start API (PUT)', async () => {
 
 		const response = await handler.default(event);
 
-		expect(response).not.toBeNull();
 		expect(response).toEqual(UnexpectedErrorResponse);
 		expect(mockResponseStatus).toBeCalledWith(event, 500);
 		expect(spyError).toBeCalled();

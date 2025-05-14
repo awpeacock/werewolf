@@ -7,6 +7,7 @@ export default defineVitestConfig({
 		setupFiles: [
 			'../tests/unit/setup/api.ts',
 			'../tests/unit/setup/dynamodb.ts',
+			'../tests/unit/setup/game.ts',
 			'../tests/unit/setup/global.ts',
 			'../tests/unit/setup/i18n.ts',
 			'../tests/unit/setup/navigation.ts',

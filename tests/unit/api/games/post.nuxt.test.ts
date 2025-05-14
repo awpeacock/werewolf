@@ -91,7 +91,7 @@ describe('Games API (POST)', async () => {
 		}));
 		const spyError = vi.spyOn(console, 'error').mockImplementation(() => null);
 
-		const retries: Array<Nullable<number>> = [null, 5];
+		const retries: Array<Undefinable<number>> = [undefined, 5];
 		for (const r of retries) {
 			setMockRetries(r);
 

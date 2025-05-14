@@ -18,7 +18,7 @@ interface WebSocketClient {
 	close: (code?: number, reason?: string) => void;
 }
 
-type GameEvent = JoinRequestEvent | AdmissionEvent | StartGameEvent;
+type GameEvent = JoinRequestEvent | AdmissionEvent | StartGameEvent | MorningEvent;
 
 interface JoinRequestBody {
 	villager: string;
@@ -52,6 +52,17 @@ interface StartGameEvent {
 	role: Role;
 }
 
+interface ActivityBody {
+	role: Role.WOLF | Role.HEALER;
+	player: string;
+	target: string;
+}
+
+interface MorningEvent {
+	type: 'morning';
+	game: Game;
+}
+
 interface FooterMeta {
 	src: string;
 	alt: string;
@@ -72,12 +83,24 @@ interface Game {
 	started?: Date | string;
 	finished?: Date | string;
 	active: boolean;
+	stage?: 'day' | 'night';
 	players: Array<Player>;
 	pending?: Array<Player>;
+	activities?: Array<Activity>;
 }
 
 interface Player {
 	id: string;
 	nickname: string;
 	roles: Array<Role>;
+}
+
+interface Activity {
+	wolf?: Nullable<string>;
+	healer?: Nullable<string>;
+	votes?: Array<Vote>;
+}
+
+interface Vote {
+	[player: string]: string;
 }

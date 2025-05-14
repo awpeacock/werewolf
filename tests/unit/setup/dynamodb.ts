@@ -8,6 +8,7 @@ import {
 } from '@aws-sdk/client-dynamodb';
 
 import {
+	stubGameActive,
 	stubGameIdDuplicateError,
 	stubGameIdGetError,
 	stubGameIdNotFound,
@@ -50,6 +51,12 @@ export const mockDynamoUpdate = vi.fn().mockImplementation(function (
 export const mockDynamoGet = vi.fn().mockImplementation(function (this: { input: unknown }, input) {
 	this.input = input;
 });
+
+let stubDynamoGame = stubGameActive;
+export const mockDynamoResponse = (game: Game): void => {
+	stubDynamoGame = game;
+};
+
 vi.mock('@aws-sdk/lib-dynamodb', () => {
 	return {
 		DynamoDBDocumentClient: {
@@ -96,6 +103,10 @@ vi.mock('@aws-sdk/lib-dynamodb', () => {
 								response = stubGameReady;
 								break;
 							}
+							case stubGameActive.id: {
+								response = stubDynamoGame;
+								break;
+							}
 							case stubGameUpdateFailure.id: {
 								response = stubGameUpdateFailure;
 								break;
@@ -109,9 +120,12 @@ vi.mock('@aws-sdk/lib-dynamodb', () => {
 							Item: {
 								Id: structuredClone(response.id),
 								Created: structuredClone(response.created),
+								Started: structuredClone(response.started),
 								Active: structuredClone(response.active),
 								Players: structuredClone(response.players),
 								Pending: structuredClone(response.pending),
+								Stage: structuredClone(response.stage),
+								Activities: structuredClone(response.activities),
 							},
 						});
 					}
