@@ -8,7 +8,6 @@ import {
 } from '@aws-sdk/client-dynamodb';
 
 import {
-	stubGameActive,
 	stubGameIdDuplicateError,
 	stubGameIdGetError,
 	stubGameIdNotFound,
@@ -18,7 +17,6 @@ import {
 	stubGameNew,
 	stubGamePending,
 	stubGameReady,
-	stubGameUpdateFailure,
 } from '@tests/unit/setup/stubs';
 
 vi.mock('@aws-sdk/client-dynamodb', async (importOriginal) => {
@@ -52,7 +50,7 @@ export const mockDynamoGet = vi.fn().mockImplementation(function (this: { input:
 	this.input = input;
 });
 
-let stubDynamoGame = stubGameActive;
+let stubDynamoGame = stubGameNew;
 export const mockDynamoResponse = (game: Game): void => {
 	stubDynamoGame = game;
 };
@@ -103,16 +101,8 @@ vi.mock('@aws-sdk/lib-dynamodb', () => {
 								response = stubGameReady;
 								break;
 							}
-							case stubGameActive.id: {
-								response = stubDynamoGame;
-								break;
-							}
-							case stubGameUpdateFailure.id: {
-								response = stubGameUpdateFailure;
-								break;
-							}
 							default: {
-								response = stubGameNew;
+								response = stubDynamoGame;
 								break;
 							}
 						}

@@ -7,6 +7,12 @@ import { useLogger } from '@/composables/useLogger';
 import { useValidation } from '@/composables/useValidation';
 import { useWebSocketBroadcast } from '@/server/util/useWebSocketBroadcast';
 import {
+	AttemptToChooseOutsideNightErrorResponse,
+	AttemptToVoteOutsideDayErrorResponse,
+	CannotVoteForDeadPlayerErrorReponse,
+	CannotVoteForEvictedPlayerErrorReponse,
+	CannotVoteTwiceErrorReponse,
+	CannotVoteUntilActivityCompleteErrorReponse,
 	GameIdNotFoundErrorResponse,
 	InvalidActionErrorResponse,
 	NicknameAlreadyExistsErrorResponse,
@@ -45,7 +51,7 @@ export default defineEventHandler(
 				roles: [],
 			};
 
-			const mayor = gameUtil.mayor();
+			const mayor = gameUtil.getMayor();
 			const admit = mayor && mayor?.id === invite;
 			let broadcast = false;
 			if (admit) {
@@ -68,7 +74,7 @@ export default defineEventHandler(
 					game: game,
 					player: player,
 				};
-				broadcast.send({ game: game.id, player: useGame(game).mayor()!.id }, payload);
+				broadcast.send({ game: game.id, player: gameUtil.getMayor()!.id }, payload);
 			}
 			setResponseStatus(event, 200);
 			return game;
@@ -80,7 +86,7 @@ export default defineEventHandler(
 
 			const gameUtil = useGame(game);
 			// Only the mayor can admit players
-			const mayor = gameUtil.mayor();
+			const mayor = gameUtil.getMayor();
 			if (mayor?.id !== body.auth) {
 				setResponseStatus(event, 403);
 				return UnauthorisedErrorResponse;
@@ -128,7 +134,7 @@ export default defineEventHandler(
 
 			const gameUtil = useGame(game);
 			// Only the mayor can start the game
-			const mayor = gameUtil.mayor();
+			const mayor = gameUtil.getMayor();
 			if (mayor?.id !== body.auth) {
 				setResponseStatus(event, 403);
 				return UnauthorisedErrorResponse;
@@ -141,6 +147,7 @@ export default defineEventHandler(
 			}
 			game.active = true;
 			game.started = new Date();
+			game.stage = 'night';
 
 			// Assign the wolf and healer roles
 			const wolf = Math.floor(Math.random() * game.players.length);
@@ -178,9 +185,15 @@ export default defineEventHandler(
 			return game;
 		};
 
-		// Handler to start the game
+		// Handler for collecting wolf/healer choices
 		const handleNight = async (game: Game) => {
 			const body: ActivityBody = await readBody(event);
+
+			// Are we meant to be getting choices now?
+			if (game.stage !== 'night') {
+				setResponseStatus(event, 400);
+				return AttemptToChooseOutsideNightErrorResponse;
+			}
 
 			const gameUtil = useGame(game);
 			// Get the latest activity to add to it
@@ -199,9 +212,6 @@ export default defineEventHandler(
 			}
 
 			if (isNew) {
-				if (!game.activities) {
-					game.activities = [];
-				}
 				game.activities?.push(activity);
 			}
 
@@ -215,6 +225,120 @@ export default defineEventHandler(
 					game: game,
 				};
 				broadcast.send({ game: game.id }, payload);
+			}
+			const dynamo: DynamoDBWrapper = useDynamoDB(event);
+			await dynamo.update(game);
+			setResponseStatus(event, 200);
+			return game;
+		};
+
+		// Handler for collecting votes
+		const handleDay = async (game: Game) => {
+			const body: VoteBody = await readBody(event);
+
+			// Are we meant to be collecting votes now?
+			if (game.stage !== 'day') {
+				setResponseStatus(event, 400);
+				return AttemptToVoteOutsideDayErrorResponse;
+			}
+
+			const gameUtil = useGame(game);
+			// Get the latest activity to add to it
+			const activity = gameUtil.getCurrentActivity();
+			const valid =
+				activity.wolf !== null &&
+				activity.wolf !== undefined &&
+				activity.healer !== null &&
+				activity.healer !== undefined;
+			if (!valid) {
+				setResponseStatus(event, 400);
+				return CannotVoteUntilActivityCompleteErrorReponse;
+			}
+
+			// Check it's a valid vote, then add to the activity
+			if (gameUtil.isPlayerDead(body.player)) {
+				setResponseStatus(event, 403);
+				return UnauthorisedErrorResponse;
+			}
+			if (gameUtil.isPlayerDead(body.vote)) {
+				setResponseStatus(event, 400);
+				return CannotVoteForDeadPlayerErrorReponse;
+			}
+			if (gameUtil.isPlayerEvicted(body.player)) {
+				setResponseStatus(event, 403);
+				return UnauthorisedErrorResponse;
+			}
+			if (gameUtil.isPlayerEvicted(body.vote)) {
+				setResponseStatus(event, 400);
+				return CannotVoteForEvictedPlayerErrorReponse;
+			}
+			const player = gameUtil.findPlayer(body.player) as Player;
+			const accused = gameUtil.findPlayer(body.vote) as Player;
+			if (!activity.votes) {
+				activity.votes = {};
+			}
+			if (Object.keys(activity.votes!).includes(body.player)) {
+				setResponseStatus(event, 400);
+				return CannotVoteTwiceErrorReponse;
+			}
+			activity.votes[player.id] = accused.id;
+
+			if (Object.keys(activity.votes).length === gameUtil.getAlivePlayers().length) {
+				// Do we move onto the next night, or is the game over (either they guessed
+				// right, or the wolf has won) - let's count up all the votes
+				const count: Record<string, number> = {};
+				for (const id of Object.values(activity.votes as Votes)) {
+					if (!(id in count)) {
+						count[id] = 0;
+					}
+					count[id]++;
+				}
+				// If we have a tie, then the group was unable to decide, there is no vote winner
+				const sorted: Array<Array<string | number>> = Object.entries(count).sort(
+					(a, b) => b[1] - a[1]
+				);
+				if (sorted.at(0)?.at(1) !== sorted.at(1)?.at(1)) {
+					activity.evicted = gameUtil.findPlayer(sorted.at(0)?.at(0) as string)!.id;
+				} else {
+					activity.evicted = null;
+				}
+
+				if (activity.evicted === gameUtil.getWolf()!.id) {
+					// If the village correctly guessed the wolf, finalise the game and broadcast it
+					game.finished = new Date();
+					game.active = false;
+					game.winner = 'village';
+
+					const broadcast = useWebSocketBroadcast();
+					const payload: GameOverEvent = {
+						type: 'game-over',
+						game: game,
+					};
+					broadcast.send({ game: game.id }, payload);
+				} else if (gameUtil.getAlivePlayers().length <= 3) {
+					// But, if we only have 3 left then the wolf has won
+					game.finished = new Date();
+					game.active = false;
+					game.winner = 'wolf';
+
+					const broadcast = useWebSocketBroadcast();
+					const payload: GameOverEvent = {
+						type: 'game-over',
+						game: game,
+					};
+					broadcast.send({ game: game.id }, payload);
+				} else {
+					// Otherwise, we go round again
+					game.stage = 'night';
+
+					const broadcast = useWebSocketBroadcast();
+					const payload: EvictionEvent = {
+						type: 'eviction',
+						game: game,
+						player: activity.evicted ? gameUtil.findPlayer(activity.evicted) : null,
+					};
+					broadcast.send({ game: game.id }, payload);
+				}
 			}
 			const dynamo: DynamoDBWrapper = useDynamoDB(event);
 			await dynamo.update(game);
@@ -247,12 +371,9 @@ export default defineEventHandler(
 					case 'night': {
 						return await handleNight(game);
 					}
-					// case 'day': {
-					// 	return await handleDay(game);
-					// }
-					// case 'end': {
-					// 	return await handleEnd(game);
-					// }
+					case 'day': {
+						return await handleDay(game);
+					}
 					// case 'reset': {
 					// 	return await handleReset(game);
 					// }

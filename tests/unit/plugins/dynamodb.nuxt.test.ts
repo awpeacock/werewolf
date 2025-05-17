@@ -3,9 +3,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NitroApp } from 'nitropack';
 import type { H3Event, EventHandlerRequest } from 'h3';
 
-import { mockDynamoGet, mockDynamoPut, mockDynamoUpdate } from '@tests/unit/setup/dynamodb';
 import {
-	stubActivityVoted1,
+	mockDynamoGet,
+	mockDynamoPut,
+	mockDynamoResponse,
+	mockDynamoUpdate,
+} from '@tests/unit/setup/dynamodb';
+import {
+	stubActivityIncorrectVotes1,
 	stubGameActive,
 	stubGameIdGetError,
 	stubGameIdNotFound,
@@ -104,7 +109,7 @@ describe('DynamoDB Nitro Plugin', async () => {
 
 		expect(async () => {
 			const game = structuredClone(stubGameActive);
-			game.activities!.push(stubActivityVoted1);
+			game.activities!.push(stubActivityIncorrectVotes1);
 			await dynamo.update(game);
 			expect(mockDynamoUpdate).toHaveBeenCalled();
 			expect(mockDynamoUpdate).toHaveBeenCalledWith(
@@ -114,7 +119,7 @@ describe('DynamoDB Nitro Plugin', async () => {
 						':started': (stubGameActive.started as Date).toISOString(),
 						':stage': stubGameActive.stage,
 						':players': stubGameActive.players,
-						':activities': [stubActivityVoted1],
+						':activities': [stubActivityIncorrectVotes1],
 					}),
 				})
 			);
@@ -141,6 +146,7 @@ describe('DynamoDB Nitro Plugin', async () => {
 			expect(game.active).toBeFalsy();
 			expect(game.players).toEqual(stubGameNew.players);
 
+			mockDynamoResponse(stubGameActive);
 			const active: Game = (await dynamo.get(stubGameActive.id)) as Game;
 			expect(mockDynamoGet).toHaveBeenCalled();
 			expect(mockDynamoGet).toHaveBeenCalledWith(

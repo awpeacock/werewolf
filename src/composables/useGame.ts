@@ -10,16 +10,25 @@ export const useGame = (game: Game) => {
 		try {
 			const api = `/api/games/${game.id}/`;
 			const response: Game = await $fetch<Game>(api, { method: 'GET' });
-			game = useGame(response).parse();
-			return game;
+			const latest = useGame(response).parse();
+			return latest;
 		} catch (e) {
 			throw new Error('Unable to retrieve game', e as Error);
 		}
 	};
 
-	const mayor = (): Nullable<Player> => {
+	const getMayor = (): Nullable<Player> => {
 		for (const player of game.players) {
 			if (player.roles.includes(Role.MAYOR)) {
+				return player;
+			}
+		}
+		return null;
+	};
+
+	const getWolf = (): Nullable<Player> => {
+		for (const player of game.players) {
+			if (player.roles.includes(Role.WOLF)) {
 				return player;
 			}
 		}
@@ -55,41 +64,71 @@ export const useGame = (game: Game) => {
 		return false;
 	};
 
-	const isPlayerDead = (identifier: string): Ref<boolean> =>
-		computed(() => {
-			if (!game.activities) {
-				return false;
-			}
-			const player = findPlayer(identifier);
-			for (const activity of game.activities) {
-				if (activity.wolf && activity.healer && activity.wolf !== activity.healer) {
-					if (player?.id === activity.wolf || player?.nickname === activity.wolf) {
-						return true;
-					}
-				}
-			}
+	const isPlayerDead = (identifier: string): boolean => {
+		if (!game.activities) {
 			return false;
-		});
-
-	const getDeadPlayers = (): Ref<Array<Player>> =>
-		computed(() => {
-			if (!game.activities) {
-				return [];
-			}
-			const players: Array<Player> = [];
-			for (const activity of game.activities) {
-				if (activity.wolf && activity.healer && activity.wolf !== activity.healer) {
-					players.push(findPlayer(activity.wolf)!);
+		}
+		const player = findPlayer(identifier);
+		for (const activity of game.activities) {
+			if (activity.wolf && activity.healer && activity.wolf !== activity.healer) {
+				if (player?.id === activity.wolf || player?.nickname === activity.wolf) {
+					return true;
 				}
 			}
-			return players;
-		});
+		}
+		return false;
+	};
 
-	const getAlivePlayers = (): Ref<Array<Player>> =>
-		computed(() => {
-			const dead = new Set(getDeadPlayers().value);
-			return game.players.filter((player) => !dead.has(player));
-		});
+	const getDeadPlayers = (): Array<Player> => {
+		if (!game.activities) {
+			return [];
+		}
+		const players: Array<Player> = [];
+		for (const activity of game.activities) {
+			if (activity.wolf && activity.healer && activity.wolf !== activity.healer) {
+				players.push(findPlayer(activity.wolf)!);
+			}
+		}
+		return players;
+	};
+
+	const isPlayerEvicted = (identifier: string): boolean => {
+		if (!game.activities) {
+			return false;
+		}
+		const player = findPlayer(identifier);
+		for (const activity of game.activities) {
+			if (player!.id === activity.evicted) {
+				return true;
+			}
+		}
+		return false;
+	};
+
+	const getEvictedPlayers = (): Array<Player> => {
+		if (!game.activities) {
+			return [];
+		}
+		const players: Array<Player> = [];
+		for (const activity of game.activities) {
+			if (activity.votes) {
+				const evicted: Nullable<Player> = activity.evicted
+					? findPlayer(activity.evicted!)
+					: null;
+				if (evicted) {
+					players.push(evicted);
+				}
+			}
+		}
+		return players;
+	};
+
+	const getAlivePlayers = (): Array<Player> => {
+		const dead = new Set(getDeadPlayers());
+		const evicted = new Set(getEvictedPlayers());
+		const alive = game.players.filter((player) => !dead.has(player) && !evicted.has(player));
+		return alive;
+	};
 
 	const admitPlayer = (identifier: string): Game => {
 		if (!game.pending) {
@@ -122,32 +161,51 @@ export const useGame = (game: Game) => {
 
 	const getCurrentActivity = (): Activity => {
 		if (!game.activities || game.activities.length == 0) {
-			return { wolf: null, healer: null, votes: [] };
+			const activity: Activity = { wolf: null, healer: null, votes: {} };
+			game.activities = [activity];
+			return activity;
 		}
 		const latest: Activity = game.activities.at(-1)!;
-		if (
-			latest!.wolf === null ||
-			latest!.healer === null ||
-			latest!.votes === undefined ||
-			latest!.votes?.length < getAlivePlayers().value.length
-		) {
+		if (!isActivityComplete(latest)) {
 			return latest;
 		}
-		return { wolf: null, healer: null, votes: [] };
+		const activity: Activity = { wolf: null, healer: null, votes: {} };
+		game.activities.push(activity);
+		return activity;
+	};
+
+	const isActivityComplete = (activity: Activity): boolean => {
+		if (activity!.wolf === null || activity!.wolf === undefined) {
+			return false;
+		}
+		if (activity!.healer === null || activity!.healer === undefined) {
+			return false;
+		}
+		if (activity!.votes === undefined) {
+			return false;
+		}
+		if (Object.keys(activity!.votes).length < getAlivePlayers().length) {
+			return false;
+		}
+		return true;
 	};
 
 	return {
 		parse,
 		getLatest,
-		mayor,
+		getMayor,
+		getWolf,
 		findPlayer,
 		hasPlayer,
 		isPlayerAdmitted,
 		isPlayerDead,
 		getDeadPlayers,
+		isPlayerEvicted,
+		getEvictedPlayers,
 		getAlivePlayers,
 		admitPlayer,
 		removePlayer,
 		getCurrentActivity,
+		isActivityComplete,
 	};
 };

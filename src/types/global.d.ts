@@ -18,7 +18,13 @@ interface WebSocketClient {
 	close: (code?: number, reason?: string) => void;
 }
 
-type GameEvent = JoinRequestEvent | AdmissionEvent | StartGameEvent | MorningEvent;
+type GameEvent =
+	| JoinRequestEvent
+	| AdmissionEvent
+	| StartGameEvent
+	| MorningEvent
+	| NightEvent
+	| GameOverEvent;
 
 interface JoinRequestBody {
 	villager: string;
@@ -63,6 +69,22 @@ interface MorningEvent {
 	game: Game;
 }
 
+interface VoteBody {
+	player: string;
+	vote: string;
+}
+
+interface EvictionEvent {
+	type: 'eviction';
+	game: Game;
+	player: Nullable<Player>;
+}
+
+interface GameOverEvent {
+	type: 'game-over';
+	game: Game;
+}
+
 interface FooterMeta {
 	src: string;
 	alt: string;
@@ -82,6 +104,7 @@ interface Game {
 	created: Date | string;
 	started?: Date | string;
 	finished?: Date | string;
+	winner?: 'wolf' | 'village';
 	active: boolean;
 	stage?: 'day' | 'night';
 	players: Array<Player>;
@@ -98,9 +121,10 @@ interface Player {
 interface Activity {
 	wolf?: Nullable<string>;
 	healer?: Nullable<string>;
-	votes?: Array<Vote>;
+	votes?: Votes;
+	evicted?: Nullable<string>;
 }
 
-interface Vote {
+interface Votes {
 	[player: string]: string;
 }

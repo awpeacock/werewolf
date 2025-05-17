@@ -28,3 +28,21 @@ export const PlayerAlreadyAdmittedErrorResponse: APIErrorResponse = {
 export const NotEnoughPlayersErrorResponse: APIErrorResponse = {
 	errors: [{ message: 'Too few players added to game' }],
 };
+export const AttemptToChooseOutsideNightErrorResponse: APIErrorResponse = {
+	errors: [{ message: 'Can only choose during night time' }],
+};
+export const AttemptToVoteOutsideDayErrorResponse: APIErrorResponse = {
+	errors: [{ message: 'Can only vote during day time' }],
+};
+export const CannotVoteUntilActivityCompleteErrorReponse: APIErrorResponse = {
+	errors: [{ message: 'Attempt to vote before wolf and healer have made choices' }],
+};
+export const CannotVoteForDeadPlayerErrorReponse: APIErrorResponse = {
+	errors: [{ message: 'Attempt to vote for a dead player' }],
+};
+export const CannotVoteForEvictedPlayerErrorReponse = {
+	errors: [{ message: 'Attempt to vote for an evicted player' }],
+};
+export const CannotVoteTwiceErrorReponse: APIErrorResponse = {
+	errors: [{ message: 'Attempt to vote twice' }],
+};

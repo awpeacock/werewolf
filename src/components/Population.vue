@@ -2,6 +2,7 @@
 defineProps<{
 	alive: Array<Player>;
 	dead: Array<Player>;
+	evicted: Array<Player>;
 }>();
 </script>
 
@@ -17,6 +18,13 @@ defineProps<{
 		</li>
 		<li v-for="(villager, idx) in dead" :key="idx" class="font-oswald text-base text-red-700">
 			{{ $t('rip', { villager: villager.nickname }) }}
+		</li>
+		<li
+			v-for="(villager, idx) in evicted"
+			:key="idx"
+			class="font-oswald text-base text-stone-600"
+		>
+			{{ $t('evicted', { villager: villager.nickname }) }}
 		</li>
 	</ul>
 </template>

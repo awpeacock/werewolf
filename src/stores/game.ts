@@ -14,11 +14,14 @@ export const useGameStore = defineStore('game', {
 	state: (): Game => ({
 		id: '',
 		created: new Date(),
+		started: undefined,
+		finished: undefined,
 		active: false,
 		stage: undefined,
 		players: [],
 		pending: [],
 		activities: [],
+		winner: undefined,
 	}),
 	actions: {
 		set(game: Game) {
@@ -51,7 +54,10 @@ export const useGameStore = defineStore('game', {
 			}
 		},
 		mayor(): Nullable<Player> {
-			return useGame(this).mayor();
+			return useGame(this).getMayor();
+		},
+		wolf(): Nullable<Player> {
+			return useGame(this).getWolf();
 		},
 	},
 	persist: config,

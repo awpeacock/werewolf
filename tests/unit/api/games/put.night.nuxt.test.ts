@@ -1,6 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+	AttemptToChooseOutsideNightErrorResponse,
 	GameIdNotFoundErrorResponse,
 	InvalidActionErrorResponse,
 	UnauthorisedErrorResponse,
@@ -14,7 +15,6 @@ import { setupRuntimeConfigForApis } from '@tests/unit/setup/runtime';
 import {
 	stubErrorCode,
 	stubGameIdNotFound,
-	stubGameNew,
 	stubGameIdUpdateError,
 	stubGameActive,
 	stubVillager6,
@@ -22,6 +22,8 @@ import {
 	stubHealer,
 	stubVillager7,
 	stubMayor,
+	stubGameUpdateFailure,
+	stubGameCorrectVotes,
 } from '@tests/unit/setup/stubs';
 import { mockWSSend } from '@tests/unit/setup/websocket';
 
@@ -65,6 +67,7 @@ describe('Night API (PUT)', async () => {
 		const victim = [stubVillager6.id, stubVillager6.nickname];
 		for (const w of wolf) {
 			for (const v of victim) {
+				mockDynamoResponse(stubGameActive);
 				stubParameters(stubGameActive.id, true, Role.WOLF, w, v);
 
 				const response = (await handler.default(event)) as Game;
@@ -97,6 +100,7 @@ describe('Night API (PUT)', async () => {
 		const victim = [stubVillager6.id, stubVillager6.nickname];
 		for (const h of healer) {
 			for (const v of victim) {
+				mockDynamoResponse(stubGameActive);
 				stubParameters(stubGameActive.id, true, Role.HEALER, h, v);
 
 				const response = (await handler.default(event)) as Game;
@@ -214,18 +218,38 @@ describe('Night API (PUT)', async () => {
 		);
 	});
 
-	it('should reject an invalid request for the choice of a wolf', async () => {
+	it('should reject a request for the choice of a wolf outside night time', async () => {
+		mockDynamoResponse(stubGameCorrectVotes);
+		stubParameters(stubGameCorrectVotes.id, true, Role.WOLF, stubWolf.id, stubVillager6.id);
+
+		const response = await handler.default(event);
+		expect(response).toMatchObject(AttemptToChooseOutsideNightErrorResponse);
+		expect(mockResponseStatus).toBeCalledWith(event, 400);
+	});
+
+	it('should reject a request for the choice of a healer outside night time', async () => {
+		mockDynamoResponse(stubGameCorrectVotes);
+		stubParameters(stubGameCorrectVotes.id, true, Role.HEALER, stubHealer.id, stubVillager6.id);
+
+		const response = await handler.default(event);
+		expect(response).toMatchObject(AttemptToChooseOutsideNightErrorResponse);
+		expect(mockResponseStatus).toBeCalledWith(event, 400);
+	});
+
+	it('should reject an invalid request for the choice of a wolf by a different player', async () => {
+		mockDynamoResponse(stubGameActive);
 		stubParameters(stubGameActive.id, true, Role.WOLF, stubHealer.id, stubVillager6.id);
 
-		const response = (await handler.default(event)) as Game;
+		const response = await handler.default(event);
 		expect(response).toMatchObject(UnauthorisedErrorResponse);
 		expect(mockResponseStatus).toBeCalledWith(event, 403);
 	});
 
-	it('should reject an invalid request for the choice of a healer', async () => {
+	it('should reject an invalid request for the choice of a healer by a different player', async () => {
+		mockDynamoResponse(stubGameActive);
 		stubParameters(stubGameActive.id, true, Role.HEALER, stubMayor.id, stubVillager6.id);
 
-		const response = (await handler.default(event)) as Game;
+		const response = await handler.default(event);
 		expect(response).toMatchObject(UnauthorisedErrorResponse);
 		expect(mockResponseStatus).toBeCalledWith(event, 403);
 	});
@@ -283,7 +307,7 @@ describe('Night API (PUT)', async () => {
 	});
 
 	it('should return an ErrorResponse if no action is supplied', async () => {
-		stubParameters(stubGameNew.id, false, Role.WOLF, stubWolf.id, stubVillager6.id);
+		stubParameters(stubGameActive.id, false, Role.WOLF, stubWolf.id, stubVillager6.id);
 
 		const response = await handler.default(event);
 
@@ -293,6 +317,9 @@ describe('Night API (PUT)', async () => {
 	});
 
 	it('should return an ErrorResponse (with unexpected error) if DynamoDB fails', async () => {
+		const game = structuredClone(stubGameUpdateFailure);
+		game.stage = 'night';
+		mockDynamoResponse(game);
 		stubParameters(stubGameIdUpdateError, true, Role.WOLF, stubWolf.id, stubVillager6.id);
 		const spyError = vi.spyOn(console, 'error').mockImplementation(() => null);
 

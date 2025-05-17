@@ -2,6 +2,7 @@
 const route = useRoute();
 const game = useGameStore();
 const player = usePlayerStore();
+const util = useGame(game);
 
 const loaded = ref(false);
 const margin = computed(() => {
@@ -22,7 +23,8 @@ onMounted(() => {
 			>
 				&lsaquo; {{ $t('go-home') }}
 			</a>
-			<span v-if="player.id !== ''" class="mt-3">
+			<span v-else>&nbsp;</span>
+			<span v-if="player.id !== '' && game && util.isPlayerAdmitted(player.id)" class="mt-3">
 				<span class="font-oswald text-yellow-200 mr-2"
 					>{{ player.nickname }} ({{ $t(player.role) }})</span
 				>

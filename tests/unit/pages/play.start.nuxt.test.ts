@@ -5,6 +5,7 @@ import { http, HttpResponse } from 'msw';
 
 import { setMockMinPlayers, setupRuntimeConfigForApis } from '../setup/runtime';
 
+import DefaultLayout from '@/layouts/default.vue';
 import page from '@/pages/play/[[id]].vue';
 import { GameIdNotFoundErrorResponse, UnauthorisedErrorResponse } from '@/types/constants';
 import { Role } from '@/types/enums';
@@ -308,6 +309,65 @@ describe('Play Game (Start Game) page', () => {
 			await triggerStart(wrapper, stubGameReady.id, stubMayor, true, 200, stubGameActive);
 
 			expect(wrapper.findComponent({ name: 'Error' }).exists()).toBeFalsy();
+		}
+	);
+
+	it.each(['en', 'de'])(
+		'should update the portfolio reactively each time a player is added',
+		async (locale: string) => {
+			setLocale(locale);
+			storeGame.set(structuredClone(stubGameInactive));
+			mockGame.getLatest = vi.fn().mockReturnValue(stubGameInactive);
+			storePlayer.set(structuredClone(stubMayor));
+
+			const wrapper = await mountSuspended(DefaultLayout, {
+				global: {
+					mocks: {
+						$t: mockT,
+					},
+					stubs: {
+						NuxtLink: stubNuxtLink,
+					},
+				},
+				route: '/play/' + stubGameInactive.id,
+				slots: {
+					default: page,
+				},
+			});
+
+			const population = wrapper.findComponent({ name: 'Population' });
+			expect(population.text()).toContain(`population (${locale}) : 2`);
+
+			mockWSLatest.value = {
+				type: 'join-request',
+				game: stubGameInactive,
+				player: stubVillager2,
+			};
+
+			await nextTick();
+
+			// That the "Notifications" component works correctly, and triggers the
+			// right API with the correct JSON is tested there - we have to assume it
+			// works here and just give us the right payload so we can check the
+			// population is updated on screen
+			const game = structuredClone(stubGameInactive);
+			game.players.push(stubVillager2);
+			server.use(
+				http.put(url + stubGameInactive.id + '/admit', async ({ request }) => {
+					await request.json();
+					return HttpResponse.json(game, { status: 200 });
+				})
+			);
+
+			expect(wrapper.findComponent({ name: 'Notifications' }).exists()).toBeTruthy();
+			const notifications = wrapper.findComponent({ name: 'Notifications' });
+			const buttons = notifications.findAll('.cursor-pointer');
+			expect(buttons.length).toBe(2);
+			await buttons[0].trigger('click');
+			await flushPromises();
+			await nextTick();
+
+			expect(population.text()).toContain(`population (${locale}) : 3`);
 		}
 	);
 

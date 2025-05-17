@@ -8,7 +8,7 @@ import {
 } from '@/types/constants';
 
 import { mockResponseStatus } from '@tests/unit/setup/api';
-import { setupDynamoWrapperForEvent } from '@tests/unit/setup/dynamodb';
+import { mockDynamoResponse, setupDynamoWrapperForEvent } from '@tests/unit/setup/dynamodb';
 import { setupRuntimeConfigForApis } from '@tests/unit/setup/runtime';
 import {
 	stubGameIdNotFound,
@@ -21,6 +21,7 @@ import {
 	stubVillager2,
 	stubGameIdUpdateError,
 	stubErrorCode,
+	stubGameUpdateFailure,
 } from '@tests/unit/setup/stubs';
 import { mockWSSend } from '@tests/unit/setup/websocket';
 
@@ -301,8 +302,10 @@ describe('Join API (PUT)', async () => {
 	});
 
 	it('should return an ErrorResponse (with unexpected error) if DynamoDB fails', async () => {
-		const spyError = vi.spyOn(console, 'error').mockImplementation(() => null);
+		const game = structuredClone(stubGameUpdateFailure);
+		mockDynamoResponse(game);
 		stubParameters(stubGameIdUpdateError, true, 'NewNickname');
+		const spyError = vi.spyOn(console, 'error').mockImplementation(() => null);
 
 		const response = await handler.default(event);
 

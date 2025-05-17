@@ -21,7 +21,11 @@ import {
 	stubActivitySaved2,
 	stubActivityBlank,
 	stubGameIncompleteActivity,
-	stubGameCompleteActivity,
+	stubGameIncorrectVotes1,
+	stubGameBlank,
+	stubGameWolfWin,
+	stubActivityTie,
+	stubActivityIncorrectVotes1,
 } from '@tests/unit/setup/stubs';
 
 describe('useGame', () => {
@@ -66,19 +70,27 @@ describe('useGame', () => {
 
 	it('should successfully extract the mayor from a game', () => {
 		const game: Game = structuredClone(stubGameNew);
+		// Move the mayor out to test that the code successfully ignores a non-mayor
 		game.players.unshift(stubVillager1);
-		const mayor: Nullable<Player> = useGame(game).mayor();
+		const mayor: Nullable<Player> = useGame(game).getMayor();
 		expect(mayor).toEqual(stubMayor);
 	});
 
+	it('should successfully extract the wolf from a game (when set)', () => {
+		const game: Game = structuredClone(stubGameActive);
+		const wolf: Nullable<Player> = useGame(game).getWolf();
+		expect(wolf).toEqual(stubWolf);
+	});
+
+	it('should successfully return null if trying to extract the wolf from a game before it has been set', () => {
+		const game: Game = structuredClone(stubGameInactive);
+		const wolf: Nullable<Player> = useGame(game).getWolf();
+		expect(wolf).toBeNull();
+	});
+
 	it('should successfully return null if a game has no mayor', () => {
-		const game: Game = {
-			id: '0000',
-			created: new Date(),
-			active: false,
-			players: [],
-		};
-		const mayor: Nullable<Player> = useGame(game).mayor();
+		const game: Game = structuredClone(stubGameBlank);
+		const mayor: Nullable<Player> = useGame(game).getMayor();
 		expect(mayor).toBeNull();
 	});
 
@@ -192,57 +204,57 @@ describe('useGame', () => {
 
 	it('should successfully return true if a player is dead (based on nickname)', () => {
 		const game: Game = structuredClone(stubGameActive);
-		game.activities?.push({ wolf: stubVillager6.id, healer: stubVillager7.id, votes: [] });
-		const dead: boolean = useGame(game).isPlayerDead(stubVillager6.nickname).value;
+		game.activities?.push({ wolf: stubVillager6.id, healer: stubVillager7.id, votes: {} });
+		const dead: boolean = useGame(game).isPlayerDead(stubVillager6.nickname);
 		expect(dead).toBeTruthy();
 	});
 
 	it('should successfully return true if a player is dead (based on ID)', () => {
 		const game: Game = structuredClone(stubGameActive);
-		game.activities?.push({ wolf: stubVillager6.id, healer: stubVillager7.id, votes: [] });
-		const dead: boolean = useGame(game).isPlayerDead(stubVillager6.id).value;
+		game.activities?.push({ wolf: stubVillager6.id, healer: stubVillager7.id, votes: {} });
+		const dead: boolean = useGame(game).isPlayerDead(stubVillager6.id);
 		expect(dead).toBeTruthy();
 	});
 
 	it('should successfully return false if a player is not dead due to no activity (based on nickname)', () => {
 		const game: Game = structuredClone(stubGameActive);
 		game.activities = undefined;
-		const dead: boolean = useGame(game).isPlayerDead(stubVillager6.nickname).value;
+		const dead: boolean = useGame(game).isPlayerDead(stubVillager6.nickname);
 		expect(dead).toBeFalsy();
 	});
 
 	it('should successfully return false if a player is not dead due to no activity (based on ID)', () => {
 		const game: Game = structuredClone(stubGameActive);
 		game.activities = undefined;
-		const dead: boolean = useGame(game).isPlayerDead(stubVillager6.id).value;
+		const dead: boolean = useGame(game).isPlayerDead(stubVillager6.id);
 		expect(dead).toBeFalsy();
 	});
 
 	it('should successfully return false if a player is not dead when not attacked (based on nickname)', () => {
 		const game: Game = structuredClone(stubGameActive);
 		game.activities?.push(stubActivityNotSaved1);
-		const dead: boolean = useGame(game).isPlayerDead(stubVillager8.nickname).value;
+		const dead: boolean = useGame(game).isPlayerDead(stubVillager8.nickname);
 		expect(dead).toBeFalsy();
 	});
 
 	it('should successfully return false if a player is not dead when not attacked (based on ID)', () => {
 		const game: Game = structuredClone(stubGameActive);
 		game.activities?.push(stubActivityNotSaved1);
-		const dead: boolean = useGame(game).isPlayerDead(stubVillager8.id).value;
+		const dead: boolean = useGame(game).isPlayerDead(stubVillager8.id);
 		expect(dead).toBeFalsy();
 	});
 
 	it('should successfully return false if a player is not dead, when saved (based on nickname)', () => {
 		const game: Game = structuredClone(stubGameActive);
-		game.activities?.push({ wolf: stubVillager6.id, healer: stubVillager6.id, votes: [] });
-		const dead: boolean = useGame(game).isPlayerDead(stubVillager6.nickname).value;
+		game.activities?.push({ wolf: stubVillager6.id, healer: stubVillager6.id, votes: {} });
+		const dead: boolean = useGame(game).isPlayerDead(stubVillager6.nickname);
 		expect(dead).toBeFalsy();
 	});
 
 	it('should successfully return false if a player is not dead, when saved (based on ID)', () => {
 		const game: Game = structuredClone(stubGameActive);
 		game.activities?.push(stubActivitySaved1);
-		const dead: boolean = useGame(game).isPlayerDead(stubVillager6.id).value;
+		const dead: boolean = useGame(game).isPlayerDead(stubVillager6.id);
 		expect(dead).toBeFalsy();
 	});
 
@@ -251,44 +263,121 @@ describe('useGame', () => {
 		game.activities?.push(stubActivityNotSaved1);
 		game.activities?.push(stubActivitySaved2);
 		game.activities?.push(stubActivityNotSaved2);
-		const dead: Array<Player> = useGame(game).getDeadPlayers().value;
+		const dead: Array<Player> = useGame(game).getDeadPlayers();
 		expect(dead).toEqual([stubVillager6, stubVillager8]);
 	});
 
 	it('should successfully retrieve an empty list of dead players for an unstarted game', () => {
 		const game: Game = structuredClone(stubGameActive);
 		game.activities = undefined;
-		const dead: Array<Player> = useGame(game).getDeadPlayers().value;
+		const dead: Array<Player> = useGame(game).getDeadPlayers();
 		expect(dead).toEqual([]);
 	});
 
 	it('should successfully retrieve an empty list of dead players for a game with a saved vilager', () => {
 		const game: Game = structuredClone(stubGameInactive);
 		game.activities?.push(stubActivitySaved1);
-		const dead: Array<Player> = useGame(game).getDeadPlayers().value;
+		const dead: Array<Player> = useGame(game).getDeadPlayers();
 		expect(dead).toEqual([]);
 	});
 
-	it('should successfully retrieve a list of all the remaining live players for a game', () => {
+	it('should successfully return true if a player has been evicted (based on nickname)', () => {
+		const game: Game = structuredClone(stubGameWolfWin);
+		const activity: Activity = game.activities!.at(1)!;
+		activity.votes![stubWolf.id] = stubMayor.id;
+		activity.evicted = stubMayor.id;
+		const evicted: boolean = useGame(game).isPlayerEvicted(stubMayor.nickname);
+		expect(evicted).toBeTruthy();
+	});
+
+	it('should successfully return true if a player has been evicted (based on ID)', () => {
+		const game: Game = structuredClone(stubGameWolfWin);
+		const activity: Activity = game.activities!.at(1)!;
+		activity.votes![stubWolf.id] = stubMayor.id;
+		activity.evicted = stubMayor.id;
+		const evicted: boolean = useGame(game).isPlayerEvicted(stubMayor.id);
+		expect(evicted).toBeTruthy();
+	});
+
+	it('should successfully return false if a player is not evicted due to no activity (based on nickname)', () => {
+		const game: Game = structuredClone(stubGameActive);
+		game.activities = undefined;
+		const evicted: boolean = useGame(game).isPlayerEvicted(stubWolf.nickname);
+		expect(evicted).toBeFalsy();
+	});
+
+	it('should successfully return false if a player is not evicted due to no activity (based on ID)', () => {
+		const game: Game = structuredClone(stubGameActive);
+		game.activities = undefined;
+		const evicted: boolean = useGame(game).isPlayerEvicted(stubWolf.nickname);
+		expect(evicted).toBeFalsy();
+	});
+
+	it('should successfully return false if a player has not been evicted (based on nickname)', () => {
+		const game: Game = structuredClone(stubGameWolfWin);
+		const evicted: boolean = useGame(game).isPlayerEvicted(stubWolf.nickname);
+		expect(evicted).toBeFalsy();
+	});
+
+	it('should successfully return false if a player has not been evicted (based on ID)', () => {
+		const game: Game = structuredClone(stubGameWolfWin);
+		const evicted: boolean = useGame(game).isPlayerDead(stubWolf.id);
+		expect(evicted).toBeFalsy();
+	});
+
+	it('should successfully retrieve a list of all the evicted players for a game', () => {
+		const game: Game = structuredClone(stubGameWolfWin);
+		game.activities!.at(-1)!.votes![stubVillager8.id] = stubHealer.id;
+		game.activities!.at(-1)!.evicted = stubHealer.id;
+		const evicted: Array<Player> = useGame(game).getEvictedPlayers();
+		expect(evicted).toEqual([stubVillager6, /*stubMayor, */ stubHealer]);
+	});
+
+	it('should successfully retrieve an empty list of evicted players for an unstarted game', () => {
+		const game: Game = structuredClone(stubGameActive);
+		game.activities = undefined;
+		const evicted: Array<Player> = useGame(game).getEvictedPlayers();
+		expect(evicted).toEqual([]);
+	});
+
+	it('should successfully retrieve an empty list of evicted players for a tied game', () => {
+		const game: Game = structuredClone(stubGameInactive);
+		game.activities?.push(stubActivityTie);
+		const evicted: Array<Player> = useGame(game).getEvictedPlayers();
+		expect(evicted).toEqual([]);
+	});
+
+	it('should successfully retrieve a list of all the remaining live players for a game with deaths', () => {
 		const game: Game = structuredClone(stubGameActive);
 		game.activities?.push(stubActivityNotSaved1);
 		game.activities?.push(stubActivitySaved2);
 		game.activities?.push(stubActivityNotSaved2);
-		const live: Array<Player> = useGame(game).getAlivePlayers().value;
+		const live: Array<Player> = useGame(game).getAlivePlayers();
 		expect(live).toEqual([stubMayor, stubVillager7, stubWolf, stubHealer]);
+	});
+
+	it('should successfully retrieve a list of all the remaining live players for a game with deaths and evictions', () => {
+		const game: Game = structuredClone(stubGameActive);
+		const activity: Activity = structuredClone(stubActivityIncorrectVotes1);
+		activity!.votes![stubVillager6.id] = stubWolf.id;
+		game.activities?.push(activity);
+		const live: Array<Player> = useGame(game).getAlivePlayers();
+		expect(live).toEqual(
+			expect.arrayContaining([stubMayor, stubVillager7, stubWolf, stubHealer])
+		);
 	});
 
 	it('should successfully retrieve a full list of alive players for an unstarted game', () => {
 		const game: Game = structuredClone(stubGameInactive);
 		game.activities = undefined;
-		const live: Array<Player> = useGame(game).getAlivePlayers().value;
+		const live: Array<Player> = useGame(game).getAlivePlayers();
 		expect(live).toEqual(stubGameInactive.players);
 	});
 
-	it('should successfully retrieve a full list of alive players for a game with a saved vilager', () => {
+	it('should successfully retrieve a full list of alive players for a game with a saved villager', () => {
 		const game: Game = structuredClone(stubGameActive);
 		game.activities?.push(stubActivitySaved1);
-		const live: Array<Player> = useGame(game).getAlivePlayers().value;
+		const live: Array<Player> = useGame(game).getAlivePlayers();
 		expect(live).toEqual(stubGameActive.players);
 	});
 
@@ -342,22 +431,64 @@ describe('useGame', () => {
 		expect(activity).toEqual(stubActivityNotSaved1);
 	});
 
-	it('should return an empty Activity as the latest for an inactive game', () => {
+	it('should return an empty Activity as the "current" for an inactive game', () => {
 		const game: Game = structuredClone(stubGameInactive);
 		game.activities = undefined;
 		const activity: Activity = useGame(game).getCurrentActivity();
 		expect(activity).toEqual(stubActivityBlank);
 	});
 
-	it('should return an empty Activity as the latest for an active game', () => {
+	it('should return an empty Activity as the "current" for an active game', () => {
 		const game: Game = structuredClone(stubGameActive);
 		const activity: Activity = useGame(game).getCurrentActivity();
 		expect(activity).toEqual(stubActivityBlank);
 	});
 
-	it('should return an empty Activity as the latest for an active game with a completed activity', () => {
-		const game: Game = structuredClone(stubGameCompleteActivity);
+	it('should return an empty Activity as the "current" for an active game with a completed activity', () => {
+		const game: Game = structuredClone(stubGameIncorrectVotes1);
+		game.activities!.at(-1)!.votes![stubVillager6.id] = stubWolf.id;
 		const activity: Activity = useGame(game).getCurrentActivity();
 		expect(activity).toEqual(stubActivityBlank);
+	});
+
+	it('should mark an activity with no wolf choice as incomplete', () => {
+		const game: Game = structuredClone(stubGameActive);
+		let activity: Activity = { healer: stubMayor.id };
+		let complete = useGame(game).isActivityComplete(activity);
+		expect(complete).toBeFalsy();
+		activity = { wolf: null, healer: stubMayor.id };
+		complete = useGame(game).isActivityComplete(activity);
+		expect(complete).toBeFalsy();
+	});
+
+	it('should mark an activity with no healer choice as incomplete', () => {
+		const game: Game = structuredClone(stubGameActive);
+		let activity: Activity = { wolf: stubMayor.id };
+		let complete = useGame(game).isActivityComplete(activity);
+		expect(complete).toBeFalsy();
+		activity = { wolf: stubMayor.id, healer: null };
+		complete = useGame(game).isActivityComplete(activity);
+		expect(complete).toBeFalsy();
+	});
+
+	it('should mark an activity with no votes as incomplete', () => {
+		const game: Game = structuredClone(stubGameActive);
+		const activity: Activity = { wolf: stubMayor.id, healer: stubMayor.id };
+		const complete = useGame(game).isActivityComplete(activity);
+		expect(complete).toBeFalsy();
+	});
+
+	it('should mark an activity without enough votes as incomplete', () => {
+		const game: Game = structuredClone(stubGameActive);
+		const complete = useGame(game).isActivityComplete(stubActivityIncorrectVotes1);
+		expect(complete).toBeFalsy();
+	});
+
+	it('should mark a complete activity as such', () => {
+		const game: Game = structuredClone(stubGameIncorrectVotes1);
+		const activity: Activity = stubActivityIncorrectVotes1;
+		activity.votes![stubVillager6.id] = stubWolf.id;
+		const complete = useGame(game).isActivityComplete(activity);
+		expect(complete).toBeTruthy();
 	});
 });

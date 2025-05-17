@@ -1,7 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { mockResponseStatus } from '@tests/unit/setup/api';
-import { setupDynamoWrapperForEvent } from '@tests/unit/setup/dynamodb';
+import { mockDynamoResponse, setupDynamoWrapperForEvent } from '@tests/unit/setup/dynamodb';
 import { setupRuntimeConfigForApis } from '@tests/unit/setup/runtime';
 import {
 	stubGameInactive,
@@ -13,6 +13,7 @@ import {
 	stubGameIdUpdateError,
 	stubErrorCode,
 	stubVillager2,
+	stubGameUpdateFailure,
 } from '@tests/unit/setup/stubs';
 import {
 	GameIdNotFoundErrorResponse,
@@ -224,6 +225,8 @@ describe('Admit API (PUT)', async () => {
 	});
 
 	it('should return an ErrorResponse (with unexpected error) if DynamoDB fails', async () => {
+		const game = structuredClone(stubGameUpdateFailure);
+		mockDynamoResponse(game);
 		stubParameters(stubGameIdUpdateError, true, stubMayor.id, stubVillager1.id);
 		const spyError = vi.spyOn(console, 'error').mockImplementation(() => null);
 

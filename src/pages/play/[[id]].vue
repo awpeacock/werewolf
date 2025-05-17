@@ -9,7 +9,7 @@ definePageMeta({
 	},
 });
 
-type PlayState = 'initial' | 'selection' | 'day' | 'night' | 'completion' | 'invalid';
+type PlayState = 'initial' | 'selection' | 'day' | 'night' | 'eviction' | 'completion' | 'invalid';
 
 const min = ref(6);
 
@@ -19,13 +19,16 @@ const util = useGame(game);
 // We always want to be sure we're dealing with the latest state of the game (user might click "Play"
 // AFTER the mayor has started the game, for example)
 try {
-	const latest = await useGame(game).getLatest();
+	const latest = await util.getLatest();
 	game.set(latest);
 	player.set(game.findPlayer(player.id) as Player);
 } catch (e) {
 	useLogger().error('Could not retrieve latest game state', e as Error);
 	// Lack of game in the session is handled with later checks, no need to do anything specific now
 }
+const activity = computed(() => {
+	return game.activities?.at(-1);
+});
 const playable = computed(() => {
 	return game.players.length >= min.value;
 });
@@ -39,29 +42,55 @@ const isHealer = computed(() => {
 	return player && player.roles.includes(Role.HEALER);
 });
 const isDead = computed(() => {
-	return useGame(game).isPlayerDead(player.id).value;
+	return util.isPlayerDead(player.id);
+});
+const isEvicted = computed(() => {
+	return util.isPlayerEvicted(player.id);
 });
 const hasDecided = computed(() => {
-	if (isWolf.value && activity.value) {
-		if (activity.value.wolf) {
+	const current: Undefinable<Activity> = game.activities?.at(-1);
+	if (!current) {
+		return false;
+	}
+	if (util.isActivityComplete(current)) {
+		return false;
+	}
+	if (isWolf.value && current) {
+		if (current.wolf) {
 			return true;
 		}
 	}
-	if (isHealer.value && activity.value) {
-		if (activity.value.healer) {
+	if (isHealer.value && current) {
+		if (current.healer) {
 			return true;
 		}
 	}
 	return false;
 });
+const hasVoted = computed(() => {
+	const current = game.activities?.at(-1);
+	if (current && current.votes) {
+		return Object.keys(current.votes).includes(player.id);
+	}
+	return false;
+});
 const victim = computed(() => {
-	if (activity.value && activity.value.wolf) {
-		return game.findPlayer(activity.value.wolf)?.nickname;
+	const current = game.activities?.at(-1);
+	if (current && current.wolf) {
+		return game.findPlayer(current.wolf)?.nickname;
 	}
 	return '';
 });
-const alive = util.getAlivePlayers();
-const dead = util.getDeadPlayers();
+const evicted = computed(() => {
+	const current = game.activities?.at(-1);
+	if (current && current.evicted) {
+		return game.findPlayer(current.evicted)?.nickname;
+	}
+	return null;
+});
+const alive = computed(() => util.getAlivePlayers());
+const dead = computed(() => util.getDeadPlayers());
+const evictees = computed(() => util.getEvictedPlayers());
 const loading: Ref<boolean> = ref(false);
 const error: Ref<Nullable<string>> = ref(null);
 
@@ -69,7 +98,9 @@ const error: Ref<Nullable<string>> = ref(null);
 const route = useRoute();
 // If the game is active, always show the player the selection screen initially
 // (in case the user was not already aware of their role)
-const state: Ref<PlayState> = ref(!game.active ? 'initial' : 'selection');
+const state: Ref<PlayState> = ref(
+	!game.active ? (game.finished ? 'completion' : 'initial') : 'selection'
+);
 const code = ref(route.params.id as string);
 if (code.value !== game.id) {
 	state.value = 'invalid';
@@ -84,9 +115,6 @@ if (code.value !== game.id) {
 		error.value = 'you-have-not-yet-joined';
 	}
 }
-const activity = computed(() => {
-	return useGame(game).getCurrentActivity();
-});
 
 // Prep the WebSocket client to handle all the game state updates
 const socket = useWebSocketClient();
@@ -192,24 +220,72 @@ const choose = async (event: MouseEvent) => {
 			}
 		});
 };
+// Handle the votes for each player
+const vote = async (event: MouseEvent) => {
+	event.preventDefault();
+	const target: Player = game.findPlayer((event.target as HTMLButtonElement).innerText) as Player;
+	loading.value = true;
+	const api = `/api/games/${code.value.toUpperCase()}/day`;
+	const body: VoteBody = {
+		player: player.id,
+		vote: target.id,
+	};
+	$fetch<Game>(api, {
+		method: 'PUT',
+		body: body,
+	})
+		.then((response: Game) => {
+			game.set(useGame(response).parse());
+			loading.value = false;
+		})
+		.catch((e) => {
+			loading.value = false;
+
+			if (e.status === 404) {
+				error.value = 'game-not-found';
+			} else {
+				error.value = 'unexpected-error';
+			}
+		});
+};
+// Move the game on after the eviction notice
+const night = async (event: MouseEvent) => {
+	event.preventDefault();
+	state.value = 'night';
+	game.activities?.push({});
+};
 
 watch(
 	() => socket.latest.value,
 	(event) => {
 		if (event) {
+			let update = false;
 			if (state.value === 'initial') {
 				if (event.type === 'start-game') {
 					const start = event as StartGameEvent;
 					player.addRole(start.role);
 					state.value = 'selection';
+					update = true;
 				}
 			}
 			if (state.value === 'night') {
 				if (event.type === 'morning') {
 					state.value = 'day';
+					update = true;
 				}
 			}
-			game.set(event.game);
+			if (state.value === 'day') {
+				if (event.type === 'eviction') {
+					state.value = 'eviction';
+					update = true;
+				} else if (event.type === 'game-over') {
+					state.value = 'completion';
+					update = true;
+				}
+			}
+			if (update) {
+				game.set(event.game);
+			}
 		}
 	}
 );
@@ -219,7 +295,7 @@ watch(
 	<div>
 		<Heading v-if="state === 'day' || state === 'night'" class="text-center uppercase">
 			{{ $t(state + '-time') }}
-			<Population :alive="alive" :dead="dead" />
+			<Population :alive="alive" :dead="dead" :evicted="evictees" />
 		</Heading>
 		<Error v-if="error" :message="error" />
 		<div v-if="state === 'invalid'">
@@ -234,7 +310,7 @@ watch(
 			<BodyText>{{ $t('story-introduction-4') }}</BodyText>
 			<BodyText>{{ $t('story-introduction-5') }}</BodyText>
 			<BodyText v-if="isMayor">{{ $t('must-have-min-players', { min: min }) }}</BodyText>
-			<Population :alive="alive" :dead="dead" />
+			<Population v-if="isMayor" :alive="alive" :dead="dead" :evicted="evictees" />
 			<Button
 				v-if="isMayor"
 				link=""
@@ -267,9 +343,9 @@ watch(
 					<BodyText>{{ $t(`make-your-decision-${role}`) }}</BodyText>
 					<div class="grid grid-cols-3 gap-4">
 						<Button
-							v-for="(villager, idx) in game.players.filter(
-								(p) => p.id !== player.id
-							)"
+							v-for="(villager, idx) in util
+								.getAlivePlayers()
+								.filter((p) => p.id !== player.id)"
 							:key="idx"
 							link=""
 							:label="villager.nickname"
@@ -286,7 +362,7 @@ watch(
 			</div>
 		</div>
 		<div v-if="state === 'day'">
-			<BodyText v-if="activity.wolf === activity.healer">
+			<BodyText v-if="activity?.wolf === activity?.healer">
 				{{ $t('activity-summary-saved') }}
 			</BodyText>
 			<BodyText v-else>
@@ -296,8 +372,61 @@ watch(
 					})
 				}}
 			</BodyText>
-			<BodyText v-if="!isDead">{{ $t('time-for-the-village-to-vote') }}</BodyText>
+			<div v-if="!isDead">
+				<BodyText>{{ $t('time-for-the-village-to-vote') }}</BodyText>
+				<div v-if="hasVoted">
+					<BodyText>{{ $t('you-have-voted') }}</BodyText>
+					<BouncingDots />
+				</div>
+				<div v-else class="grid grid-cols-3 gap-4">
+					<Button
+						v-for="(villager, idx) in util
+							.getAlivePlayers()
+							.filter((p) => p.id !== player.id)"
+						:key="idx"
+						link=""
+						:label="villager.nickname"
+						:translate="false"
+						class="w-full"
+						@click="vote"
+					/>
+				</div>
+			</div>
 			<BodyText v-else>{{ $t('you-cannot-vote-as-you-are-dead') }}</BodyText>
+		</div>
+		<div v-if="state === 'eviction'">
+			<div v-if="isEvicted">
+				<BodyText>{{ $t('you-have-been-evicted') }}</BodyText>
+			</div>
+			<div v-else>
+				<BodyText>{{ $t('you-have-not-chosen-the-wolf') }}</BodyText>
+				<BodyText v-if="evicted">
+					{{
+						$t('you-have-evicted', {
+							evicted: evicted,
+						})
+					}}
+				</BodyText>
+				<BodyText v-else>
+					{{ $t('you-have-evicted-nobody') }}
+				</BodyText>
+				<Button link="" label="continue" class="w-full" @click="night" />
+			</div>
+		</div>
+		<div v-if="state === 'completion'">
+			<Heading class="text-center">{{ $t('game-over') }}</Heading>
+			<BodyText v-if="game.winner === 'wolf' && isWolf">
+				{{ $t('congratulations-wolf') }}
+			</BodyText>
+			<BodyText v-if="game.winner === 'wolf' && !isWolf">
+				{{ $t('you-lost-village', { wolf: game.wolf!.nickname }) }}
+			</BodyText>
+			<BodyText v-if="game.winner === 'village' && isWolf">
+				{{ $t('you-lost-wolf') }}
+			</BodyText>
+			<BodyText v-if="game.winner === 'village' && !isWolf">
+				{{ $t('congratulations-village', { wolf: game.wolf!.nickname }) }}
+			</BodyText>
 		</div>
 	</div>
 </template>

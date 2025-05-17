@@ -111,7 +111,7 @@ describe('Play Game (Night time) page', () => {
 	);
 
 	it.each(['en', 'de'])(
-		'should display the correct night time page for the wolf and the healer',
+		'should display the correct day time voting page',
 		async (locale: string) => {
 			storeGame.set(structuredClone(stubGameActive));
 			mockGame.getLatest = vi.fn().mockReturnValue(stubGameActive);
