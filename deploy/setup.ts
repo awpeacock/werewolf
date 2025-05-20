@@ -6,7 +6,9 @@ import { existsSync } from 'fs';
 import { heading, info, log, success, fail, parseArguments } from './funcs';
 
 const params = parseArguments(process.argv);
-const env = params['env'];
+const action = params['run'] ?? 'build';
+const env =
+	params['env'] ?? (action === 'build' || action === 'preview' ? 'production' : undefined);
 const setup = params['setup'] ? params['setup'] === 'yes' : true;
 
 if (!setup) {

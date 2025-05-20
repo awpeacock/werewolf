@@ -1,13 +1,13 @@
 {
 	"name": "werewolf-game",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"description": "A website version of the party game.",
 	"private": true,
 	"type": "module",
 	"scripts": {
 		"predev": "npm run setup",
 		"dev": "cross-env npm_config_env=$npm_config_env cross-env-shell \"npx tsx deploy/startup.ts env:$npm_config_env run:dev\"",
-		"prebuild": "npm run setup",
+		"prebuild": "npm run setup -- run:build",
 		"build": "cross-env npm_config_env=$npm_config_env npm_config_build=$npm_config_build cross-env-shell \"npx tsx deploy/startup.ts env:$npm_config_env run:build\"",
 		"prepreview": "npm run build",
 		"preview": "concurrently \"nuxt preview\" \"wait-on http://localhost:3000 && open-cli http://localhost:3000\"",

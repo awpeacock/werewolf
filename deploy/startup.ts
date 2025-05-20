@@ -8,7 +8,8 @@ import { heading, info, log, success, warn, fail, parseArguments } from './funcs
 const params = parseArguments(process.argv);
 const action = params['run'] ?? 'build';
 const build = params['build'] ? params['build'] === 'yes' : true;
-const env = (params['env'] ?? action === 'build') ? 'production' : '';
+const env =
+	params['env'] ?? (action === 'build' || action === 'preview' ? 'production' : undefined);
 
 if (action === 'build' && !build) {
 	process.exit(0);

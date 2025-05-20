@@ -10,5 +10,17 @@ export const useEnvironment = () => {
 				return false;
 			}
 		},
+		// Same goes for detecting if in production or dev mode
+		isProduction: () => {
+			try {
+				const dev =
+					typeof import.meta !== 'undefined'
+						? (import.meta.env?.DEV ?? import.meta.env?.dev)
+						: undefined;
+				return dev === false;
+			} catch {
+				return false;
+			}
+		},
 	};
 };

@@ -3,6 +3,7 @@ import { vi } from 'vitest';
 export const mockNavigate = vi.fn();
 
 export const stubNuxtLink = {
+	name: 'NuxtLink',
 	props: ['to'],
 	template: `
 	  <div

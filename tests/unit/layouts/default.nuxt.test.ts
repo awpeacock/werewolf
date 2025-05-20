@@ -74,7 +74,9 @@ describe('Default layout', async () => {
 		await flushPromises();
 
 		let bar = wrapper.find('.justify-between');
-		expect(bar.find('a').exists()).toBeFalsy();
+		let links = bar.findAll('[data-test-link][data-to="/"]');
+		expect(links.length).toBe(1);
+		expect(links.some((link) => link.text().includes('go-home'))).toBeFalsy();
 		expect(bar.text()).toContain(`${stubWolf.nickname} (wolf (en))`);
 		expect(bar.text()).toContain(game.id);
 
@@ -82,6 +84,8 @@ describe('Default layout', async () => {
 		await flushPromises();
 
 		bar = wrapper.find('.justify-between');
-		expect(bar.find('a').exists()).toBeTruthy();
+		links = bar.findAll('[data-test-link][data-to="/"]');
+		expect(links.length).toBe(1);
+		expect(links.some((link) => link.text().includes('go-home'))).toBeTruthy();
 	});
 });
