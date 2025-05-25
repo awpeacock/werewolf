@@ -13,7 +13,7 @@ export default defineNuxtPlugin(async (_nuxtApp) => {
 
 			if (player && player.id) {
 				useLogger().info(`Player found on session [${player.id}] - restoring WebSocket`);
-				useWebSocketClient().connect(game, player);
+				useBroadcastClient().connect(game, player);
 			}
 		}
 	} catch (e) {

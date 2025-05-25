@@ -83,6 +83,7 @@
 	"activity-summary-not-saved": "The night is over, and it has been a sad night for Lycanville - the werewolf struck again, and the healer was unable to save {victim}.",
 	"time-for-the-village-to-vote": "It is time for the village to vote and see if they can rid themselves of this wolf menace:",
 	"you-cannot-vote-as-you-are-dead": "Unfortunately, you are unable to vote because you are dead.",
+	"you-cannot-vote-as-you-have-been-evicted": "Unfortunately, you are unable to vote because you have been evicted.",
 	"you-have-voted": "You have already voted, thanks.  We are waiting for the rest of the villagers to vote.",
 	"you-have-been-evicted": "It's bad news - you have been evicted from the village.  You can now only watch on helplessly.",
 	"you-have-not-chosen-the-wolf": "Unfortunately, on this occasion you have not been able to root out the werewolf.  The village has to spend another night in fear.",
@@ -92,5 +93,6 @@
 	"congratulations-wolf": "Congratulations!  You have managed to fool your fellow villagers into thinking you are one of them.  There are so few of them left now, nobody can stop you feasting.",
 	"congratulations-village": "Congratulations!  You have managed to successfully identify the werewolf.  The village of Lycanville is finally safe from their reign of terror.",
 	"you-lost-wolf": "It's bad news for you - the villagers have managed to successfully identify you as the werewolf.  The village is safe, and a silver bullet awaits you...",
-	"you-lost-village": "It's terrible news for the village of Lycanville - you have not been able to identify the werewolf and there are now so few of you left you are defenceless from their attacks.."
+	"you-lost-village": "It's terrible news for the village of Lycanville - you have not been able to identify the werewolf and there are now so few of you left you are defenceless from their attacks..",
+	"the-wolf-was": "The Werewolf was {wolf}."
 }

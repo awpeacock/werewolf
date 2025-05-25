@@ -16,16 +16,6 @@ const min = ref(6);
 const game = useGameStore();
 const player = usePlayerStore();
 const util = useGame(game);
-// We always want to be sure we're dealing with the latest state of the game (user might click "Play"
-// AFTER the mayor has started the game, for example)
-try {
-	const latest = await util.getLatest();
-	game.set(latest);
-	player.set(game.findPlayer(player.id) as Player);
-} catch (e) {
-	useLogger().error('Could not retrieve latest game state', e as Error);
-	// Lack of game in the session is handled with later checks, no need to do anything specific now
-}
 const activity = computed(() => {
 	return game.activities?.at(-1);
 });
@@ -77,14 +67,14 @@ const hasVoted = computed(() => {
 const victim = computed(() => {
 	const current = game.activities?.at(-1);
 	if (current && current.wolf) {
-		return game.findPlayer(current.wolf)?.nickname;
+		return game.findPlayer(current.wolf);
 	}
-	return '';
+	return null;
 });
 const evicted = computed(() => {
 	const current = game.activities?.at(-1);
 	if (current && current.evicted) {
-		return game.findPlayer(current.evicted)?.nickname;
+		return game.findPlayer(current.evicted);
 	}
 	return null;
 });
@@ -93,31 +83,17 @@ const dead = computed(() => util.getDeadPlayers());
 const evictees = computed(() => util.getEvictedPlayers());
 const loading: Ref<boolean> = ref(false);
 const error: Ref<Nullable<string>> = ref(null);
+const override: Ref<boolean> = ref(false);
 
 // Navigation - check which stage we're at
 const route = useRoute();
 // If the game is active, always show the player the selection screen initially
 // (in case the user was not already aware of their role)
-const state: Ref<PlayState> = ref(
-	!game.active ? (game.finished ? 'completion' : 'initial') : 'selection'
-);
+const state: Ref<PlayState> = ref('initial');
 const code = ref(route.params.id as string);
-if (code.value !== game.id) {
-	state.value = 'invalid';
-	if (code.value === undefined || code.value === '') {
-		error.value = 'you-must-come-here-with-a-valid-game-code';
-	} else {
-		error.value = 'you-have-the-wrong-game-code';
-	}
-} else {
-	if (!player || player.id === '') {
-		state.value = 'invalid';
-		error.value = 'you-have-not-yet-joined';
-	}
-}
 
 // Prep the WebSocket client to handle all the game state updates
-const socket = useWebSocketClient();
+const socket = useBroadcastClient();
 
 // Selection screen values
 const role = computed(() => {
@@ -135,7 +111,7 @@ const role = computed(() => {
 });
 
 // Let's detect if we've got a player already in the process of joining
-onMounted(() => {
+onMounted(async () => {
 	// Configurable values
 	const config = useRuntimeConfig().public.MIN_PLAYERS;
 	if (config) {
@@ -143,7 +119,25 @@ onMounted(() => {
 	}
 
 	const player = usePlayerStore();
-	// If already invalidated, use the error already supplied
+	// Load the latest game state, then some sanity checks -
+	// the code in the URL must match up to that in the session,
+	// and the player must be in the game
+	await refresh();
+	if (code.value !== game.id) {
+		state.value = 'invalid';
+		if (code.value === undefined || code.value === '') {
+			error.value = 'you-must-come-here-with-a-valid-game-code';
+		} else {
+			error.value = 'you-have-the-wrong-game-code';
+		}
+	} else {
+		if (!player || player.id === '') {
+			state.value = 'invalid';
+			error.value = 'you-have-not-yet-joined';
+		}
+	}
+	// Check whether the player in session is part of the game if not already
+	// invalidated - if already invalidated, use the error already supplied
 	if (state.value !== 'invalid') {
 		if (game.hasPlayer(player.id)) {
 			if (!game.isPlayerAdmitted(player.id)) {
@@ -154,6 +148,10 @@ onMounted(() => {
 			state.value = 'invalid';
 			error.value = 'you-are-not-a-player-in-this-game';
 		}
+	}
+	// If not invalidated, check the default state
+	if (state.value !== 'invalid') {
+		state.value = !game.active ? (game.finished ? 'completion' : 'initial') : 'selection';
 	}
 });
 
@@ -185,6 +183,7 @@ const start = async (event: MouseEvent) => {
 // Play the game (ie move it to night time so the wolf and healer pick)
 const play = async (event: MouseEvent) => {
 	event.preventDefault();
+	refresh();
 	if (game.stage) {
 		state.value = game.stage;
 	} else {
@@ -251,8 +250,24 @@ const vote = async (event: MouseEvent) => {
 // Move the game on after the eviction notice
 const night = async (event: MouseEvent) => {
 	event.preventDefault();
-	state.value = 'night';
-	game.activities?.push({});
+	if (!override.value) {
+		state.value = 'night';
+		game.activities?.push({});
+	} else {
+		state.value = 'day';
+	}
+	override.value = false;
+};
+// We always want to be sure we're dealing with the latest state of the game (user might click "Play"
+// AFTER the mayor has started the game, for example)
+const refresh = async () => {
+	try {
+		const latest = await util.getLatest();
+		game.set(latest);
+		player.set(game.findPlayer(player.id) as Player);
+	} catch (e) {
+		useLogger().error('Could not retrieve latest game state', e as Error);
+	}
 };
 
 watch(
@@ -260,28 +275,30 @@ watch(
 	(event) => {
 		if (event) {
 			let update = false;
-			if (state.value === 'initial') {
-				if (event.type === 'start-game') {
-					const start = event as StartGameEvent;
-					player.addRole(start.role);
-					state.value = 'selection';
-					update = true;
-				}
+			if (event.type === 'start-game') {
+				const start = event as StartGameEvent;
+				player.addRole(start.role);
+				state.value = 'selection';
+				update = true;
 			}
-			if (state.value === 'night') {
-				if (event.type === 'morning') {
+			if (event.type === 'morning') {
+				if (state.value !== 'eviction') {
 					state.value = 'day';
-					update = true;
+				}
+				update = true;
+				// If a villager clicks continue after the wolf and healer have
+				// chosen, they will be pushed through to the night screen unless
+				// we ensure that is overridden
+				if (!isWolf.value && !isHealer.value) {
+					override.value = true;
 				}
 			}
-			if (state.value === 'day') {
-				if (event.type === 'eviction') {
-					state.value = 'eviction';
-					update = true;
-				} else if (event.type === 'game-over') {
-					state.value = 'completion';
-					update = true;
-				}
+			if (event.type === 'eviction') {
+				state.value = 'eviction';
+				update = true;
+			} else if (event.type === 'game-over') {
+				state.value = 'completion';
+				update = true;
 			}
 			if (update) {
 				game.set(event.game);
@@ -368,11 +385,11 @@ watch(
 			<BodyText v-else>
 				{{
 					$t('activity-summary-not-saved', {
-						victim: victim,
+						victim: victim?.nickname,
 					})
 				}}
 			</BodyText>
-			<div v-if="!isDead">
+			<div v-if="!isDead && !isEvicted">
 				<BodyText>{{ $t('time-for-the-village-to-vote') }}</BodyText>
 				<div v-if="hasVoted">
 					<BodyText>{{ $t('you-have-voted') }}</BodyText>
@@ -392,7 +409,12 @@ watch(
 					/>
 				</div>
 			</div>
-			<BodyText v-else>{{ $t('you-cannot-vote-as-you-are-dead') }}</BodyText>
+			<div v-else>
+				<BodyText v-if="isDead">{{ $t('you-cannot-vote-as-you-are-dead') }}</BodyText>
+				<BodyText v-if="isEvicted">{{
+					$t('you-cannot-vote-as-you-have-been-evicted')
+				}}</BodyText>
+			</div>
 		</div>
 		<div v-if="state === 'eviction'">
 			<div v-if="isEvicted">
@@ -403,7 +425,7 @@ watch(
 				<BodyText v-if="evicted">
 					{{
 						$t('you-have-evicted', {
-							evicted: evicted,
+							evicted: evicted.nickname,
 						})
 					}}
 				</BodyText>
@@ -419,14 +441,19 @@ watch(
 				{{ $t('congratulations-wolf') }}
 			</BodyText>
 			<BodyText v-if="game.winner === 'wolf' && !isWolf">
-				{{ $t('you-lost-village', { wolf: game.wolf!.nickname }) }}
+				{{ $t('you-lost-village') }}
 			</BodyText>
 			<BodyText v-if="game.winner === 'village' && isWolf">
 				{{ $t('you-lost-wolf') }}
 			</BodyText>
 			<BodyText v-if="game.winner === 'village' && !isWolf">
-				{{ $t('congratulations-village', { wolf: game.wolf!.nickname }) }}
+				{{ $t('congratulations-village') }}
 			</BodyText>
+			<Heading v-if="!isWolf && game.wolf" class="text-center">
+				<span class="text-white">
+					{{ $t('the-wolf-was', { wolf: game.wolf?.nickname }) }}
+				</span>
+			</Heading>
 		</div>
 	</div>
 </template>

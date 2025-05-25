@@ -193,7 +193,35 @@ describe('Notifications', async () => {
 	);
 
 	it.each(['en', 'de'])(
-		'should ignore any events that are not join requests',
+		'should update game state on invitation acceptances',
+		async (locale: string) => {
+			setLocalePath(locale);
+			setupStores(stubGameNew, stubMayor);
+
+			const wrapper = await mountSuspended(Notifications, {
+				global: {
+					mocks: {
+						$t: mockT,
+					},
+				},
+			});
+
+			expect(wrapper.text()).toEqual('');
+
+			mockWSLatest.value = {
+				type: 'invite-accept',
+				game: stubGameNew,
+				player: stubVillager1,
+			};
+
+			await nextTick();
+			expect(wrapper.text()).not.toContain(stubVillager1.nickname);
+			expect(wrapper.findComponent({ name: 'YesNo' }).exists()).not.toBeTruthy();
+		}
+	);
+
+	it.each(['en', 'de'])(
+		'should ignore any events that are not join requests or invite accepts',
 		async (locale: string) => {
 			setLocalePath(locale);
 			setupStores(stubGameNew, stubMayor);

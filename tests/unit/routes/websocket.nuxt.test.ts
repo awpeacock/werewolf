@@ -18,7 +18,7 @@ interface GameHandler {
 }
 
 describe('Server Game route', async () => {
-	const { default: gameHandler } = (await import('@/server/routes/game')) as unknown as {
+	const { default: gameHandler } = (await import('@/server/routes/websocket')) as unknown as {
 		default: GameHandler;
 	};
 

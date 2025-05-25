@@ -39,7 +39,7 @@ const errNickname: Ref<Nullable<string>> = ref(null);
 const errGlobal: Ref<Nullable<string>> = ref(null);
 
 // Prep the WebSocket client to handle the response to the join request
-const socket = useWebSocketClient();
+const socket = useBroadcastClient();
 
 // Let's detect if we've got a player already in the process of joining
 onMounted(() => {

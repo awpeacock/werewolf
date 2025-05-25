@@ -2,7 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useWebSocketBroadcast } from '@/server/util/useWebSocketBroadcast';
 
-import { stubGameActive, stubGamePending, stubVillager1 } from '@tests/unit/setup/stubs';
+import {
+	stubGameActive,
+	stubGamePending,
+	stubMayor,
+	stubVillager1,
+	stubVillager3,
+} from '@tests/unit/setup/stubs';
 
 vi.unmock('@/server/util/useWebSocketBroadcast');
 
@@ -35,18 +41,18 @@ describe('useWebSocketBroadcast', async () => {
 
 	it('should successfully open a WebSocket connection', () => {
 		// This tests where the util has to setup the game key
-		broadcast.open(clients[0], 'ABCD', '8a6b67d5-428e-412f-a681-003e0bd840ed');
+		broadcast.open(clients[0], stubGamePending.id, stubVillager1.id);
 
 		expect(spyLog).toHaveBeenCalledWith(
 			expect.stringContaining(
-				'WebSocket opened for player ID 8a6b67d5-428e-412f-a681-003e0bd840ed (Game Code: ABCD)'
+				`WebSocket opened for player ID ${stubVillager1.id} (Game Code: ${stubGamePending.id})`
 			)
 		);
 		// This tests for existing keys
-		broadcast.open(clients[1], 'ABCD', '1bb99196-fca2-4431-bd9a-0e1d021aeb35');
+		broadcast.open(clients[1], stubGamePending.id, stubMayor.id);
 		expect(spyLog).toHaveBeenCalledWith(
 			expect.stringContaining(
-				'WebSocket opened for player ID 1bb99196-fca2-4431-bd9a-0e1d021aeb35 (Game Code: ABCD)'
+				`WebSocket opened for player ID ${stubMayor.id} (Game Code: ${stubGamePending.id})`
 			)
 		);
 	});
@@ -57,39 +63,35 @@ describe('useWebSocketBroadcast', async () => {
 			game: stubGamePending,
 			player: stubVillager1,
 		};
-		broadcast.send({ game: 'ABCD', player: '1bb99196-fca2-4431-bd9a-0e1d021aeb35' }, event);
+		broadcast.send({ game: stubGamePending.id, player: stubMayor.id }, event);
 		expect(clients[1].send).toHaveBeenCalled();
 		expect(clients[0].send).not.toHaveBeenCalled();
 	});
 
 	it('should successfully send a message to all players of a game', () => {
-		//TODO Change the event when we have a global event type
-		const event: JoinRequestEvent = {
-			type: 'join-request',
-			game: stubGameActive,
-			player: stubVillager1,
+		const event: MorningEvent = {
+			type: 'morning',
+			game: stubGamePending,
 		};
-		broadcast.send({ game: 'ABCD' }, event);
+		broadcast.send({ game: stubGamePending.id }, event);
 		expect(clients[0].send).toHaveBeenCalled();
 		expect(clients[1].send).toHaveBeenCalled();
 	});
 
 	it('should catch any errors sending an event and log them', () => {
-		broadcast.open(clients[2], 'ABCD', '0f18f18b-e4e4-4a69-8093-8bc606db1f64');
+		broadcast.open(clients[2], stubGamePending.id, stubVillager3.id);
 
 		const event: JoinRequestEvent = {
 			type: 'join-request',
-			game: stubGameActive,
+			game: stubGamePending,
 			player: stubVillager1,
 		};
 		expect(() => {
-			broadcast.send({ game: 'ABCD', player: '0f18f18b-e4e4-4a69-8093-8bc606db1f64' }, event);
+			broadcast.send({ game: stubGamePending.id, player: stubVillager3.id }, event);
 		}).not.toThrowError();
 		expect(clients[2].send).toHaveBeenCalled();
 		expect(spyError).toHaveBeenCalledWith(
-			expect.stringContaining(
-				'WebSocket send failed - player ID 0f18f18b-e4e4-4a69-8093-8bc606db1f64 removed'
-			)
+			expect.stringContaining(`WebSocket send failed - player ID ${stubVillager3.id} removed`)
 		);
 	});
 

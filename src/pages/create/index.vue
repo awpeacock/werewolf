@@ -68,7 +68,7 @@ const create = async (): Promise<void> => {
 				game.set(useGame(response).parse());
 				usePlayerStore().set(game.mayor as Player);
 				// Now setup the connection to listen for notifications
-				useWebSocketClient().connect(game, game.mayor!);
+				useBroadcastClient().connect(game, game.mayor!);
 			})
 			.catch((e) => {
 				loading.value = false;

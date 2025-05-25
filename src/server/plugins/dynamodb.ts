@@ -44,14 +44,17 @@ export default defineNitroPlugin((nitro) => {
 		// Update a game on the database
 		update: async (game: Game): Promise<void> => {
 			try {
-				let expression = 'SET Players = :players, Pending = :pending, Active = :active';
+				let expression = 'SET Players = :players, Active = :active';
 				const values: {
 					[key: string]: Undefinable<Array<Player>> | boolean | string | Array<Activity>;
 				} = {
 					':players': game.players,
-					':pending': game.pending,
 					':active': game.active,
 				};
+				if (game.pending) {
+					expression += ', Pending = :pending';
+					values[':pending'] = game.pending;
+				}
 				if (game.started) {
 					expression += ', Started = :started';
 					values[':started'] = (game.started as Date).toISOString();

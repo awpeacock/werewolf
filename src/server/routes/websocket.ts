@@ -1,7 +1,7 @@
 import { parse } from 'url';
 
 import { useLogger } from '@/composables/useLogger';
-import { useWebSocketBroadcast } from '@/server/util/useWebSocketBroadcast';
+import { useBroadcast } from '@/server/util/useBroadcast';
 
 export default defineWebSocketHandler({
 	open(peer) {
@@ -9,7 +9,7 @@ export default defineWebSocketHandler({
 		const code = url.query.code as Undefinable<string>;
 		const player = url.query.player as Undefinable<string>;
 		if (code && player) {
-			useWebSocketBroadcast().open(peer, code, player);
+			useBroadcast().open(peer, code, player);
 		} else {
 			useLogger().error('WebSocket open request without game code or player');
 			peer.close();

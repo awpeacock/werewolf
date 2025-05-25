@@ -11,7 +11,9 @@ export function useWebSocketClient() {
 			useLogger().warn('Attempt to open up a new WebSocket connection when already open');
 			return;
 		}
-		const url = `ws://${window.location.host}/game?code=${game.id}&player=${player.id}`;
+
+		const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+		const url = `${protocol}://${window.location.host}/game?code=${game.id}&player=${player.id}`;
 		socket.value = new WebSocket(url);
 
 		socket.value.onopen = () => {
@@ -23,6 +25,7 @@ export function useWebSocketClient() {
 			latest.value = event;
 			events.value.push(event);
 			handle(event);
+			useLogger().info(`Event received: ${event.type}`);
 			useLogger().info(events.value.length + ' message(s) received');
 		};
 

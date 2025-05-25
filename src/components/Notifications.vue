@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const socket = useWebSocketClient();
+const socket = useBroadcastClient();
 const game = useGameStore();
 const player = usePlayerStore();
 const pending = reactive<Player[]>([]);
@@ -23,9 +23,13 @@ watch(
 	() => socket.latest.value,
 	(event) => {
 		if (event && isMayor.value) {
-			if (event.type == 'join-request') {
+			if (event.type === 'join-request') {
 				const request = event as JoinRequestEvent;
 				pending.push(request.player);
+			}
+			if (event.type === 'invite-accept') {
+				const acceptance = event as InviteAcceptEvent;
+				game.players.push(acceptance.player);
 			}
 		}
 	}

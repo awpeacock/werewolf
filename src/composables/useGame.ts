@@ -13,7 +13,7 @@ export const useGame = (game: Game) => {
 			const latest = useGame(response).parse();
 			return latest;
 		} catch (e) {
-			throw new Error('Unable to retrieve game', e as Error);
+			throw new Error(`Unable to retrieve game "${game.id}"`, e as Error);
 		}
 	};
 

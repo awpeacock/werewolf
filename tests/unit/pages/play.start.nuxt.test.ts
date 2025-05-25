@@ -313,11 +313,12 @@ describe('Play Game (Start Game) page', () => {
 	);
 
 	it.each(['en', 'de'])(
-		'should update the portfolio reactively each time a player is added',
+		'should update the population reactively each time a player is added',
 		async (locale: string) => {
 			setLocale(locale);
-			storeGame.set(structuredClone(stubGameInactive));
-			mockGame.getLatest = vi.fn().mockReturnValue(stubGameInactive);
+			const game = structuredClone(stubGameInactive);
+			storeGame.set(game);
+			mockGame.getLatest = vi.fn().mockReturnValue(game);
 			storePlayer.set(structuredClone(stubMayor));
 
 			const wrapper = await mountSuspended(DefaultLayout, {
@@ -329,9 +330,9 @@ describe('Play Game (Start Game) page', () => {
 						NuxtLink: stubNuxtLink,
 					},
 				},
-				route: '/play/' + stubGameInactive.id,
+				route: '/play/' + game.id,
 				slots: {
-					default: page,
+					default: () => h(page),
 				},
 			});
 
@@ -340,7 +341,7 @@ describe('Play Game (Start Game) page', () => {
 
 			mockWSLatest.value = {
 				type: 'join-request',
-				game: stubGameInactive,
+				game: game,
 				player: stubVillager2,
 			};
 
@@ -350,11 +351,10 @@ describe('Play Game (Start Game) page', () => {
 			// right API with the correct JSON is tested there - we have to assume it
 			// works here and just give us the right payload so we can check the
 			// population is updated on screen
-			const game = structuredClone(stubGameInactive);
-			game.players.push(stubVillager2);
 			server.use(
-				http.put(url + stubGameInactive.id + '/admit', async ({ request }) => {
+				http.put(url + game.id + '/admit', async ({ request }) => {
 					await request.json();
+					game.players.push(structuredClone(stubVillager2));
 					return HttpResponse.json(game, { status: 200 });
 				})
 			);
@@ -368,6 +368,17 @@ describe('Play Game (Start Game) page', () => {
 			await nextTick();
 
 			expect(population.text()).toContain(`population (${locale}) : 3`);
+
+			mockWSLatest.value = {
+				type: 'invite-accept',
+				game: game,
+				player: stubVillager3,
+			};
+
+			await nextTick();
+
+			expect(population.text()).toContain(`population (${locale}) : 4`);
+			wrapper.unmount();
 		}
 	);
 

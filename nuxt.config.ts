@@ -42,7 +42,12 @@ export default defineNuxtConfig({
 		AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
 		AWS_DYNAMODB_TABLE: process.env.AWS_DYNAMODB_TABLE,
 		CREATE_MAX_RETRIES: process.env.CREATE_MAX_RETRIES,
+		PUSHER_APP_SECRET: process.env.PUSHER_APP_SECRET,
 		public: {
+			BROADCAST_PROVIDER: process.env.BROADCAST_PROVIDER,
+			PUSHER_APP_ID: process.env.PUSHER_APP_ID,
+			PUSHER_APP_KEY: process.env.PUSHER_APP_KEY,
+			PUSHER_CLUSTER: process.env.PUSHER_CLUSTER,
 			MIN_PLAYERS: process.env.MIN_PLAYERS,
 		},
 	},

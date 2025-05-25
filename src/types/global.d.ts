@@ -20,6 +20,7 @@ interface WebSocketClient {
 
 type GameEvent =
 	| JoinRequestEvent
+	| InviteAcceptEvent
 	| AdmissionEvent
 	| StartGameEvent
 	| MorningEvent
@@ -32,6 +33,12 @@ interface JoinRequestBody {
 
 interface JoinRequestEvent {
 	type: 'join-request';
+	game: Game;
+	player: Player;
+}
+
+interface InviteAcceptEvent {
+	type: 'invite-accept';
 	game: Game;
 	player: Player;
 }

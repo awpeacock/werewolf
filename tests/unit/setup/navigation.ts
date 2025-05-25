@@ -2,7 +2,7 @@ import { vi } from 'vitest';
 
 export const mockNavigate = vi.fn();
 
-export const stubNuxtLink = {
+export const stubNuxtLink = defineComponent({
 	name: 'NuxtLink',
 	props: ['to'],
 	template: `
@@ -20,11 +20,13 @@ export const stubNuxtLink = {
 			navigate: mockNavigate,
 		};
 	},
-};
+});
 
-export const stubNuxtLinkWithMethod = (method: (_e: MouseEvent) => void) => ({
-	props: ['to'],
-	template: `
+export const stubNuxtLinkWithMethod = (method: (_e: MouseEvent) => void) =>
+	defineComponent({
+		name: 'NuxtLinkWithMethod',
+		props: ['to'],
+		template: `
 	  <div
 		data-test-link
 		@click="handleParentClick"
@@ -35,10 +37,10 @@ export const stubNuxtLinkWithMethod = (method: (_e: MouseEvent) => void) => ({
 		<slot :navigate="navigate" />
 	  </div>
 	`,
-	setup() {
-		return {
-			handleParentClick: method,
-			navigate: mockNavigate,
-		};
-	},
-});
+		setup() {
+			return {
+				handleParentClick: method,
+				navigate: mockNavigate,
+			};
+		},
+	});

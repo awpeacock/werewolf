@@ -37,6 +37,27 @@ describe('useWebSocketClient', async () => {
 		);
 	});
 
+	it('should successfully connect to a secure server', async () => {
+		Object.defineProperty(window, 'location', {
+			value: {
+				...window.location,
+				protocol: 'https:',
+				host: 'domain',
+			},
+			writable: true,
+		});
+
+		const game = structuredClone(stubGameNew);
+		socket.connect(game, stubMayor);
+		await flushPromises();
+
+		expect(spyLog).toHaveBeenCalledWith(expect.stringContaining('WebSocket connected'));
+		const mockInstance = MockWebSocket.instances.at(-1);
+		expect(mockInstance!.url).toEqual(
+			`wss://domain/game?code=${game.id}&player=${stubMayor.id}`
+		);
+	});
+
 	it('should warn if an attempt is made to connect with an already active socket', async () => {
 		const game = structuredClone(stubGameNew);
 		socket.connect(game, stubMayor);

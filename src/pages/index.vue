@@ -23,7 +23,7 @@ const reset = (action: string) => {
 	if (reset) {
 		game.$reset();
 		player.$reset();
-		useWebSocketClient().disconnect();
+		useBroadcastClient().disconnect();
 	}
 };
 </script>

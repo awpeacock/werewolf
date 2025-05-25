@@ -5,7 +5,7 @@ import { useDynamoDB } from '@/composables/useDynamoDB';
 import { useGame } from '@/composables/useGame';
 import { useLogger } from '@/composables/useLogger';
 import { useValidation } from '@/composables/useValidation';
-import { useWebSocketBroadcast } from '@/server/util/useWebSocketBroadcast';
+import { useBroadcast } from '@/server/util/useBroadcast';
 import {
 	AttemptToChooseOutsideNightErrorResponse,
 	AttemptToVoteOutsideDayErrorResponse,
@@ -53,7 +53,6 @@ export default defineEventHandler(
 
 			const mayor = gameUtil.getMayor();
 			const admit = mayor && mayor?.id === invite;
-			let broadcast = false;
 			if (admit) {
 				game.players.push(player);
 			} else {
@@ -61,20 +60,28 @@ export default defineEventHandler(
 					game.pending = [];
 				}
 				game.pending!.push(player);
-				broadcast = true;
 			}
 
 			const dynamo: DynamoDBWrapper = useDynamoDB(event);
 			await dynamo.update(game);
-			if (broadcast) {
-				// Broadcast to the mayor
-				const broadcast = useWebSocketBroadcast();
+			if (!admit) {
+				// Broadcast join request to the mayor
+				const broadcast = useBroadcast();
 				const payload: JoinRequestEvent = {
 					type: 'join-request',
 					game: game,
 					player: player,
 				};
-				broadcast.send({ game: game.id, player: gameUtil.getMayor()!.id }, payload);
+				await broadcast.send({ game: game.id, player: gameUtil.getMayor()!.id }, payload);
+			} else {
+				// Broadcast admittance to the mayor
+				const broadcast = useBroadcast();
+				const payload: InviteAcceptEvent = {
+					type: 'invite-accept',
+					game: game,
+					player: player,
+				};
+				await broadcast.send({ game: game.id, player: gameUtil.getMayor()!.id }, payload);
 			}
 			setResponseStatus(event, 200);
 			return game;
@@ -117,13 +124,13 @@ export default defineEventHandler(
 			const dynamo: DynamoDBWrapper = useDynamoDB(event);
 			await dynamo.update(game);
 			// Broadcast to the villager in question
-			const broadcast = useWebSocketBroadcast();
+			const broadcast = useBroadcast();
 			const payload: AdmissionEvent = {
 				type: 'admission',
 				game: game,
 				response: body.admit,
 			};
-			broadcast.send({ game: game.id, player: body.villager }, payload);
+			await broadcast.send({ game: game.id, player: body.villager }, payload);
 			setResponseStatus(event, 200);
 			return game;
 		};
@@ -172,14 +179,14 @@ export default defineEventHandler(
 			const dynamo: DynamoDBWrapper = useDynamoDB(event);
 			await dynamo.update(game);
 			// Broadcast to the villager in question
-			const broadcast = useWebSocketBroadcast();
+			const broadcast = useBroadcast();
 			for (const player of game.players) {
 				const payload: StartGameEvent = {
 					type: 'start-game',
 					game: game,
 					role: player.roles.filter((role) => role !== Role.MAYOR)[0],
 				};
-				broadcast.send({ game: game.id, player: player.id }, payload);
+				await broadcast.send({ game: game.id, player: player.id }, payload);
 			}
 			setResponseStatus(event, 200);
 			return game;
@@ -219,12 +226,12 @@ export default defineEventHandler(
 			// we need to broadcast the move on to daytime
 			if (activity.wolf !== null && activity.healer !== null) {
 				game.stage = 'day';
-				const broadcast = useWebSocketBroadcast();
+				const broadcast = useBroadcast();
 				const payload: MorningEvent = {
 					type: 'morning',
 					game: game,
 				};
-				broadcast.send({ game: game.id }, payload);
+				await broadcast.send({ game: game.id }, payload);
 			}
 			const dynamo: DynamoDBWrapper = useDynamoDB(event);
 			await dynamo.update(game);
@@ -309,35 +316,35 @@ export default defineEventHandler(
 					game.active = false;
 					game.winner = 'village';
 
-					const broadcast = useWebSocketBroadcast();
+					const broadcast = useBroadcast();
 					const payload: GameOverEvent = {
 						type: 'game-over',
 						game: game,
 					};
-					broadcast.send({ game: game.id }, payload);
+					await broadcast.send({ game: game.id }, payload);
 				} else if (gameUtil.getAlivePlayers().length <= 3) {
 					// But, if we only have 3 left then the wolf has won
 					game.finished = new Date();
 					game.active = false;
 					game.winner = 'wolf';
 
-					const broadcast = useWebSocketBroadcast();
+					const broadcast = useBroadcast();
 					const payload: GameOverEvent = {
 						type: 'game-over',
 						game: game,
 					};
-					broadcast.send({ game: game.id }, payload);
+					await broadcast.send({ game: game.id }, payload);
 				} else {
 					// Otherwise, we go round again
 					game.stage = 'night';
 
-					const broadcast = useWebSocketBroadcast();
+					const broadcast = useBroadcast();
 					const payload: EvictionEvent = {
 						type: 'eviction',
 						game: game,
 						player: activity.evicted ? gameUtil.findPlayer(activity.evicted) : null,
 					};
-					broadcast.send({ game: game.id }, payload);
+					await broadcast.send({ game: game.id }, payload);
 				}
 			}
 			const dynamo: DynamoDBWrapper = useDynamoDB(event);

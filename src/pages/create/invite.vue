@@ -16,6 +16,7 @@ const loaded = ref(false);
 const showShare = ref(false);
 const showInvite = ref(false);
 const showCopy = ref(false);
+const copied = ref(false);
 const error = ref('');
 const url = ref('');
 const mailto = ref('');
@@ -34,6 +35,7 @@ const share = async (event: MouseEvent) => {
 };
 const copy = () => {
 	navigator.clipboard.writeText(url.value);
+	copied.value = true;
 };
 
 onMounted(() => {
@@ -74,9 +76,14 @@ onMounted(() => {
 					>
 						<p
 							v-if="showCopy"
-							class="flex flex-row justify-end -mt-2 mb-[calc((var(--spacing)*2)-16px)] -mr-2"
+							class="flex flex-row justify-end -mt-2 mb-[calc((var(--spacing)*2)-16px)] -mr-2 cursor-pointer"
 						>
-							<IconCopy class="w-[16px]" @click="copy" />
+							<IconCopy
+								v-if="!copied"
+								class="w-[16px] mt-[2px] mb-[1px]"
+								@click="copy"
+							/>
+							<span v-else>&#10004;</span>
 						</p>
 						<p class="my-auto pr-[16px] lg:text-lg">{{ url }}</p>
 					</div>
@@ -86,7 +93,7 @@ onMounted(() => {
 			</div>
 		</div>
 		<div v-else>
-			<p class="mb-4 font-oswald text-base text-white">{{ $t(error) }}</p>
+			<p v-if="error" class="mb-4 font-oswald text-base text-white">{{ $t(error) }}</p>
 		</div>
 		<Button link="/create" label="go-back" class="w-full" />
 	</div>
