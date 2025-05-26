@@ -214,6 +214,7 @@ describe('Play Game (Night time) page', () => {
 					game: game,
 				};
 				await flushPromises();
+				await nextTick();
 
 				expect(wrapper.text()).toContain(`activity-summary-saved (${locale})`);
 			}
@@ -221,7 +222,7 @@ describe('Play Game (Night time) page', () => {
 	);
 
 	it.each(['en', 'de'])(
-		'should present the results for all players when they have chosen differently',
+		'should present the results for all players when the wolf and healer have chosen differently',
 		async (locale: string) => {
 			storeGame.set(structuredClone(stubGameActive));
 			mockGame.getLatest = vi.fn().mockReturnValue(stubGameActive);
@@ -242,6 +243,7 @@ describe('Play Game (Night time) page', () => {
 					game: game,
 				};
 				await flushPromises();
+				await nextTick();
 
 				expect(wrapper.text()).toContain(
 					`activity-summary-not-saved {victim: ${stubGameActive.players.at(0)!.nickname}}  (${locale})`

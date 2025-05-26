@@ -1,4 +1,5 @@
 <script setup lang="ts">
+const app = useNuxtApp();
 const route = useRoute();
 const game = useGameStore();
 const player = usePlayerStore();
@@ -9,7 +10,7 @@ const margin = computed(() => {
 	return route.meta.footer ? 'max-sm:mb-[250px]' : '';
 });
 const direction = computed(() => {
-	return route.path === '/' ? 'md:flex-row' : '';
+	return route.path === '/' && !app.payload.error ? 'md:flex-row' : '';
 });
 onMounted(() => {
 	loaded.value = true;
@@ -51,7 +52,7 @@ onMounted(() => {
 				<LocaleSwitcher />
 			</div>
 			<div class="flex flex-col" :class="direction">
-				<Header class="md:w-[250px] md:mx-4" />
+				<Header />
 				<main :class="`w-full p-4 ${margin}`">
 					<slot />
 				</main>
