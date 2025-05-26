@@ -42,10 +42,11 @@ describe('Home page', () => {
 			expect(wrapper.text()).not.toContain(`play-game (${locale})`);
 			expect(wrapper.text()).not.toContain(`resume-game (${locale})`);
 		}
+		expect(wrapper.text()).toContain(`how-to-play (${locale})`);
 
 		const links = wrapper.findAllComponents(RouterLinkStub);
 		expect(links).not.toBeNull();
-		expect(links.length).toBe((hasInactiveGame || hasActiveGame) && hasValidPlayer ? 3 : 2);
+		expect(links.length).toBe((hasInactiveGame || hasActiveGame) && hasValidPlayer ? 4 : 3);
 		expect(links[0]!.props('to')).toEqual({ path: '/create', query: {} });
 		expect(links[1]!.props('to')).toEqual({ path: '/join', query: {} });
 		if (hasInactiveGame && hasValidPlayer) {
@@ -60,6 +61,11 @@ describe('Home page', () => {
 				query: {},
 			});
 		}
+		const last = (hasInactiveGame || hasActiveGame) && hasValidPlayer ? 3 : 2;
+		expect(links[last]!.props('to')).toEqual({
+			path: `/instructions`,
+			query: {},
+		});
 	};
 
 	beforeEach(() => {

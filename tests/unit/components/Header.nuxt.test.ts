@@ -41,6 +41,42 @@ describe('Header', async () => {
 				expect(h2).not.toBeNull();
 				expect(h2.text()).toEqual(`${title} (${locale})`);
 			}
+			expect(wrapper.html()).toContain('werewolf.webp');
 		}
+	});
+
+	it.each(['en', 'de'])('should mount successfully for errors', async (locale: string) => {
+		setLocale(locale);
+		vi.mock('#app', async () => {
+			const original = await vi.importActual('#app');
+			return {
+				...original,
+				useNuxtApp: () => ({
+					payload: {
+						error: {
+							statusCode: 404,
+							message: 'Page not found',
+						},
+					},
+				}),
+			};
+		});
+
+		const wrapper = await mountSuspended(Header, {
+			global: {
+				mocks: {
+					$t: mockT,
+				},
+			},
+		});
+		await wrapper.vm.$router.push('/no-such-page');
+		await nextTick();
+		await flushPromises();
+
+		const h1 = wrapper.find('h1');
+		expect(h1).not.toBeNull();
+		expect(mockT).toHaveBeenCalled();
+		expect(h1.text()).toEqual(`werewolf (${locale})`);
+		expect(wrapper.html()).not.toContain('werewolf.webp');
 	});
 });

@@ -44,5 +44,6 @@ const reset = (action: string) => {
 			label="resume-game"
 			class="w-full"
 		/>
+		<Button link="/instructions" label="how-to-play" class="w-full" />
 	</nav>
 </template>

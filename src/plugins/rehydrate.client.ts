@@ -4,6 +4,7 @@ export default defineNuxtPlugin(async (_nuxtApp) => {
 	// game while we're at it).
 	const game = useGameStore();
 	const player = usePlayerStore();
+
 	try {
 		if (game && game.id) {
 			useLogger().info(`Existing game found on session [${game.id}] - Retrieving state`);
