@@ -175,19 +175,16 @@ describe('DynamoDB Nitro Plugin', async () => {
 
 		const log = vi.spyOn(console, 'error').mockImplementation(() => null);
 
-		await expect(dynamo.put(stubGamePutFailure)).rejects.toThrow();
-		expect(log).toHaveBeenLastCalledWith(
-			expect.stringContaining('Unable to save game: Simulated "put" failure')
-		);
+		// These no longer log, but rather purely bubble up (to prevent duplicate messages in the logs)
+		await expect(dynamo.put(stubGamePutFailure)).rejects.toThrow('Simulated "put" failure');
+		expect(log).not.toHaveBeenCalled();
 
-		await expect(dynamo.update(stubGameUpdateFailure)).rejects.toThrow();
-		expect(log).toHaveBeenLastCalledWith(
-			expect.stringContaining('Unable to update game: Simulated "update" failure')
+		await expect(dynamo.update(stubGameUpdateFailure)).rejects.toThrow(
+			'Simulated "update" failure'
 		);
+		expect(log).not.toHaveBeenCalled();
 
-		await expect(dynamo.get(stubGameIdGetError)).rejects.toThrow();
-		expect(log).toHaveBeenLastCalledWith(
-			expect.stringContaining('Unable to retrieve game: Simulated "get" failure')
-		);
+		await expect(dynamo.get(stubGameIdGetError)).rejects.toThrow('Simulated "get" failure');
+		expect(log).not.toHaveBeenCalled();
 	});
 });

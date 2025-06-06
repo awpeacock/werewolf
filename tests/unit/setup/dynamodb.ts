@@ -8,6 +8,11 @@ import {
 } from '@aws-sdk/client-dynamodb';
 
 import {
+	stubGameConcurrentFailure,
+	stubGameConcurrentRetry,
+	stubGameDeadHealer,
+	stubGameIdConcurrentUpdateError,
+	stubGameIdConcurrentUpdateRetry,
 	stubGameIdDuplicateError,
 	stubGameIdGetError,
 	stubGameIdNotFound,
@@ -55,6 +60,8 @@ export const mockDynamoResponse = (game: Game): void => {
 	stubDynamoGame = game;
 };
 
+let countConcurrencyFailures = 0;
+
 vi.mock('@aws-sdk/lib-dynamodb', () => {
 	return {
 		DynamoDBDocumentClient: {
@@ -78,6 +85,29 @@ vi.mock('@aws-sdk/lib-dynamodb', () => {
 						if (command.input?.Key?.Id === stubGameIdUpdateError) {
 							return Promise.reject(new Error('Simulated "update" failure'));
 						}
+						if (command.input?.Key?.Id === stubGameIdConcurrentUpdateError) {
+							class ConditionalCheckFailedError extends Error {
+								override readonly name = 'ConditionalCheckFailedException';
+							}
+							return Promise.reject(
+								new ConditionalCheckFailedError(
+									'Simulated "update" concurrency failure'
+								)
+							);
+						}
+						if (command.input?.Key?.Id === stubGameIdConcurrentUpdateRetry) {
+							countConcurrencyFailures++;
+							if (countConcurrencyFailures < 2) {
+								class ConditionalCheckFailedError extends Error {
+									override readonly name = 'ConditionalCheckFailedException';
+								}
+								return Promise.reject(
+									new ConditionalCheckFailedError(
+										'Simulated "update" concurrency failure'
+									)
+								);
+							}
+						}
 						return Promise.resolve({});
 					}
 					if (command instanceof mockDynamoGet) {
@@ -99,6 +129,18 @@ vi.mock('@aws-sdk/lib-dynamodb', () => {
 							}
 							case stubGameReady.id: {
 								response = stubGameReady;
+								break;
+							}
+							case stubGameDeadHealer.id: {
+								response = stubGameDeadHealer;
+								break;
+							}
+							case stubGameConcurrentFailure.id: {
+								response = stubGameConcurrentFailure;
+								break;
+							}
+							case stubGameConcurrentRetry.id: {
+								response = stubGameConcurrentRetry;
 								break;
 							}
 							default: {

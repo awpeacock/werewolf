@@ -35,6 +35,15 @@ export const useGame = (game: Game) => {
 		return null;
 	};
 
+	const getHealer = (): Nullable<Player> => {
+		for (const player of game.players) {
+			if (player.roles.includes(Role.HEALER)) {
+				return player;
+			}
+		}
+		return null;
+	};
+
 	const findPlayer = (identifier: string): Nullable<Player> => {
 		for (const player of game.players) {
 			if (player.nickname === identifier || player.id === identifier) {
@@ -195,6 +204,7 @@ export const useGame = (game: Game) => {
 		getLatest,
 		getMayor,
 		getWolf,
+		getHealer,
 		findPlayer,
 		hasPlayer,
 		isPlayerAdmitted,

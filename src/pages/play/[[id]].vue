@@ -168,15 +168,15 @@ const start = async (event: MouseEvent) => {
 		})
 			.then((response: Game) => {
 				game.set(useGame(response).parse());
+				loading.value = false;
 			})
 			.catch((e) => {
-				loading.value = false;
-
 				if (e.status === 404) {
 					error.value = 'game-not-found';
 				} else {
 					error.value = 'unexpected-error';
 				}
+				loading.value = false;
 			});
 	}
 };
@@ -193,8 +193,8 @@ const play = async (event: MouseEvent) => {
 // Handle the choices of the wolf and the healer
 const choose = async (event: MouseEvent) => {
 	event.preventDefault();
-	const target: Player = game.findPlayer((event.target as HTMLButtonElement).innerText) as Player;
 	loading.value = true;
+	const target: Player = game.findPlayer((event.target as HTMLButtonElement).innerText) as Player;
 	const api = `/api/games/${code.value.toUpperCase()}/night`;
 	const body: ActivityBody = {
 		role: isWolf.value ? Role.WOLF : Role.HEALER,
@@ -210,13 +210,12 @@ const choose = async (event: MouseEvent) => {
 			loading.value = false;
 		})
 		.catch((e) => {
-			loading.value = false;
-
 			if (e.status === 404) {
 				error.value = 'game-not-found';
 			} else {
 				error.value = 'unexpected-error';
 			}
+			loading.value = false;
 		});
 };
 // Handle the votes for each player
@@ -238,13 +237,12 @@ const vote = async (event: MouseEvent) => {
 			loading.value = false;
 		})
 		.catch((e) => {
-			loading.value = false;
-
 			if (e.status === 404) {
 				error.value = 'game-not-found';
 			} else {
 				error.value = 'unexpected-error';
 			}
+			loading.value = false;
 		});
 };
 // Move the game on after the eviction notice
@@ -310,6 +308,7 @@ watch(
 
 <template>
 	<div>
+		<Spinner v-if="loading" />
 		<Heading v-if="state === 'day' || state === 'night'" class="text-center uppercase">
 			{{ $t(state + '-time') }}
 			<Population :alive="alive" :dead="dead" :evicted="evictees" />

@@ -9,7 +9,7 @@ import {
 
 import { mockResponseStatus } from '@tests/unit/setup/api';
 import { mockDynamoResponse, setupDynamoWrapperForEvent } from '@tests/unit/setup/dynamodb';
-import { setupRuntimeConfigForApis } from '@tests/unit/setup/runtime';
+import { setMockRetries, setupRuntimeConfigForApis } from '@tests/unit/setup/runtime';
 import {
 	stubGameIdNotFound,
 	stubGameInactive,
@@ -22,6 +22,8 @@ import {
 	stubGameIdUpdateError,
 	stubErrorCode,
 	stubGameUpdateFailure,
+	stubGameConcurrentFailure,
+	stubGameConcurrentRetry,
 } from '@tests/unit/setup/stubs';
 import { mockWSSend } from '@tests/unit/setup/websocket';
 
@@ -216,6 +218,21 @@ describe('Join API (PUT)', async () => {
 		expect(mockResponseStatus).toBeCalledWith(event, 200);
 	});
 
+	it('should retry if two requests arrive at the same time and attempt to update the DB concurrently', async () => {
+		stubParameters(stubGameConcurrentRetry.id, true, stubVillager2.nickname);
+		const spyWarn = vi.spyOn(console, 'warn').mockImplementation(() => null);
+
+		const retries: Array<Undefinable<number>> = [undefined, 5];
+		for (const r of retries) {
+			setMockRetries(r);
+
+			const response = await handler.default(event);
+			expectPending(response as Game, stubGameConcurrentRetry, 6, 2);
+			expect(mockResponseStatus).toBeCalledWith(event, 200);
+			expect(spyWarn).toBeCalled();
+		}
+	});
+
 	it('should return an ErrorResponse (with validation messages) if the code is invalid', async () => {
 		const codes = [
 			null,
@@ -301,6 +318,24 @@ describe('Join API (PUT)', async () => {
 		expect(mockResponseStatus).toBeCalledWith(event, 400);
 	});
 
+	it('should return an ErrorResponse if too many concurrent attempts are made to update DynamoDB', async () => {
+		stubParameters(stubGameConcurrentFailure.id, true, stubVillager2.nickname);
+		const spyWarn = vi.spyOn(console, 'warn').mockImplementation(() => null);
+		const spyError = vi.spyOn(console, 'error').mockImplementation(() => null);
+
+		const retries: Array<Undefinable<number>> = [undefined, 5];
+		for (const r of retries) {
+			setMockRetries(r);
+
+			const response = await handler.default(event);
+			expect(response).not.toBeNull();
+			expect(response).toEqual(UnexpectedErrorResponse);
+			expect(mockResponseStatus).toBeCalledWith(event, 500);
+			expect(spyError).toBeCalled();
+			expect(spyWarn).toBeCalled();
+		}
+	});
+
 	it('should return an ErrorResponse (with unexpected error) if DynamoDB fails', async () => {
 		const game = structuredClone(stubGameUpdateFailure);
 		mockDynamoResponse(game);
@@ -308,7 +343,20 @@ describe('Join API (PUT)', async () => {
 		const spyError = vi.spyOn(console, 'error').mockImplementation(() => null);
 
 		const response = await handler.default(event);
+		expect(response).not.toBeNull();
+		expect(response).toEqual(UnexpectedErrorResponse);
+		expect(mockResponseStatus).toBeCalledWith(event, 500);
+		expect(spyError).toBeCalled();
+	});
 
+	it('should return an ErrorResponse (with unexpected error) if something other than DynamoDB fails', async () => {
+		const game = structuredClone(stubGameNew);
+		mockDynamoResponse(game);
+		// @ts-expect-error Type '{ id: string; }' is not assignable to type 'string'.
+		stubParameters({ id: 'Invalid' }, true, 'NewNickname');
+		const spyError = vi.spyOn(console, 'error').mockImplementation(() => null);
+
+		const response = await handler.default(event);
 		expect(response).not.toBeNull();
 		expect(response).toEqual(UnexpectedErrorResponse);
 		expect(mockResponseStatus).toBeCalledWith(event, 500);

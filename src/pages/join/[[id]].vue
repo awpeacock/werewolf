@@ -18,6 +18,7 @@ const loading: Ref<boolean> = ref(false);
 // included in the URL, and generate the play link, if applicable
 const route = useRoute();
 const router = useRouter();
+const localePath = useLocalePath();
 const state: Ref<JoinState> = ref('form');
 const editable =
 	route.params.id === undefined || route.params.id === null || route.params.id === '';
@@ -85,7 +86,6 @@ const join = async (_event: MouseEvent) => {
 			body: body,
 		})
 			.then((response: Game) => {
-				loading.value = false;
 				game.set(useGame(response).parse());
 				const player: Nullable<Player> = game.findPlayer(valNickname.value);
 				if (player === null) {
@@ -97,12 +97,12 @@ const join = async (_event: MouseEvent) => {
 					if (!game.isPlayerAdmitted(player.nickname)) {
 						state.value = 'wait';
 					} else {
-						router.push(game.url);
+						router.push(localePath(game.url));
 					}
 				}
+				loading.value = false;
 			})
 			.catch((err) => {
-				loading.value = false;
 				if (err.status === 404) {
 					errGlobal.value = 'game-not-found';
 				} else {
@@ -119,6 +119,7 @@ const join = async (_event: MouseEvent) => {
 						}
 					}
 				}
+				loading.value = false;
 			});
 	}
 };

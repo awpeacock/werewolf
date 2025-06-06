@@ -86,6 +86,13 @@ stubVotesTie[stubMayor.id] = stubVillager6.id;
 stubVotesTie[stubWolf.id] = stubVillager6.id;
 stubVotesTie[stubHealer.id] = stubVillager7.id;
 
+export const stubVotesDeadHealer: Votes = {};
+stubVotesDeadHealer[stubVillager6.id] = stubVillager7.id;
+stubVotesDeadHealer[stubVillager7.id] = stubWolf.id;
+stubVotesDeadHealer[stubVillager8.id] = stubWolf.id;
+stubVotesDeadHealer[stubMayor.id] = stubVillager6.id;
+stubVotesDeadHealer[stubWolf.id] = stubVillager6.id;
+
 export const stubVotesWolf1: Votes = {};
 stubVotesWolf1[stubVillager8.id] = stubMayor.id;
 stubVotesWolf1[stubMayor.id] = stubVillager8.id;
@@ -137,6 +144,11 @@ export const stubActivityTie: Activity = {
 	healer: stubVillager7.id,
 	votes: stubVotesTie,
 };
+export const stubActivityDeadHealer: Activity = {
+	wolf: stubHealer.id,
+	healer: stubVillager6.id,
+	votes: stubVotesTie,
+};
 export const stubActivitiesWolfWin: Array<Activity> = [
 	{
 		wolf: stubVillager7.id,
@@ -160,6 +172,8 @@ export const stubActivitiesWolfWin: Array<Activity> = [
 export const stubGameIdPutError = 'PUTF';
 export const stubGameIdDuplicateError = 'DUPE';
 export const stubGameIdUpdateError = 'UPDF';
+export const stubGameIdConcurrentUpdateError = 'CONC';
+export const stubGameIdConcurrentUpdateRetry = 'RETR';
 export const stubGameIdGetError = 'GETF';
 export const stubGameIdNotFound = 'NONE';
 
@@ -245,8 +259,16 @@ export const stubGameTie: Game = {
 	players: [stubMayor, stubVillager6, stubVillager7, stubVillager8, stubWolf, stubHealer],
 	activities: [stubActivityTie],
 };
-export const stubGameWolfWin: Game = {
+export const stubGameDeadHealer: Game = {
 	id: 'S2T1',
+	created: new Date(),
+	active: true,
+	stage: 'night',
+	players: [stubMayor, stubVillager6, stubVillager7, stubVillager8, stubWolf, stubHealer],
+	activities: [stubActivityDeadHealer],
+};
+export const stubGameWolfWin: Game = {
+	id: 'U0V1',
 	created: new Date(),
 	active: true,
 	stage: 'day',
@@ -261,6 +283,20 @@ export const stubGamePutFailure: Game = {
 };
 export const stubGameUpdateFailure: Game = {
 	id: stubGameIdUpdateError,
+	created: new Date(),
+	active: false,
+	players: [stubMayor, stubWolf, stubHealer, stubVillager6, stubVillager7, stubVillager8],
+	pending: [stubVillager1],
+};
+export const stubGameConcurrentFailure: Game = {
+	id: stubGameIdConcurrentUpdateError,
+	created: new Date(),
+	active: false,
+	players: [stubMayor, stubWolf, stubHealer, stubVillager6, stubVillager7, stubVillager8],
+	pending: [stubVillager1],
+};
+export const stubGameConcurrentRetry: Game = {
+	id: stubGameIdConcurrentUpdateRetry,
 	created: new Date(),
 	active: false,
 	players: [stubMayor, stubWolf, stubHealer, stubVillager6, stubVillager7, stubVillager8],

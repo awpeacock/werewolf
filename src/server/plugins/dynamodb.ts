@@ -24,99 +24,95 @@ export default defineNitroPlugin((nitro) => {
 	const dynamo: DynamoDBWrapper = {
 		// Store a newly created game to the database
 		put: async (game: Game): Promise<void> => {
-			try {
-				const put = new PutCommand({
-					TableName: config.AWS_DYNAMODB_TABLE,
-					Item: {
-						Id: game.id,
-						Created: new Date().toISOString(),
-						Active: false,
-						Players: game.players,
-					},
-					ConditionExpression: 'attribute_not_exists(Id)',
-				});
-				await docClient.send(put);
-			} catch (e) {
-				useLogger().error(`Unable to save game: ${(e as Error).message}`);
-				throw e;
-			}
+			const put = new PutCommand({
+				TableName: config.AWS_DYNAMODB_TABLE,
+				Item: {
+					Id: game.id,
+					Created: new Date().toISOString(),
+					Active: false,
+					Players: game.players,
+					Version: 1,
+				},
+				ConditionExpression: 'attribute_not_exists(Id)',
+			});
+			await docClient.send(put);
 		},
 		// Update a game on the database
 		update: async (game: Game): Promise<void> => {
-			try {
-				let expression = 'SET Players = :players, Active = :active';
-				const values: {
-					[key: string]: Undefinable<Array<Player>> | boolean | string | Array<Activity>;
-				} = {
-					':players': game.players,
-					':active': game.active,
-				};
-				if (game.pending) {
-					expression += ', Pending = :pending';
-					values[':pending'] = game.pending;
-				}
-				if (game.started) {
-					expression += ', Started = :started';
-					values[':started'] = (game.started as Date).toISOString();
-				}
-				if (game.stage) {
-					expression += ', Stage = :stage';
-					values[':stage'] = game.stage;
-				}
-				if (game.activities) {
-					expression += ', Activities = :activities';
-					values[':activities'] = game.activities;
-				}
-				const update = new UpdateCommand({
-					TableName: config.AWS_DYNAMODB_TABLE,
-					Key: {
-						Id: game.id,
-					},
-					UpdateExpression: expression,
-					ExpressionAttributeValues: values,
-					ReturnValues: 'ALL_NEW',
-				});
-				await docClient.send(update);
-			} catch (e) {
-				useLogger().error(`Unable to update game: ${(e as Error).message}`);
-				throw e;
+			let expression = 'SET Players = :players, Active = :active';
+			const values: {
+				[key: string]:
+					| Undefinable<Array<Player>>
+					| boolean
+					| string
+					| Array<Activity>
+					| number;
+			} = {
+				':players': game.players,
+				':active': game.active,
+			};
+			if (game.pending) {
+				expression += ', Pending = :pending';
+				values[':pending'] = game.pending;
 			}
+			if (game.started) {
+				expression += ', Started = :started';
+				values[':started'] = (game.started as Date).toISOString();
+			}
+			if (game.stage) {
+				expression += ', Stage = :stage';
+				values[':stage'] = game.stage;
+			}
+			if (game.activities) {
+				expression += ', Activities = :activities';
+				values[':activities'] = game.activities;
+			}
+			expression += ', Version = :next';
+			values[':next'] = game.version! + 1;
+			values[':current'] = game.version!;
+			const update = new UpdateCommand({
+				TableName: config.AWS_DYNAMODB_TABLE,
+				Key: {
+					Id: game.id,
+				},
+				UpdateExpression: expression,
+				ExpressionAttributeValues: values,
+				ConditionExpression: 'Version = :current',
+				ReturnValues: 'ALL_NEW',
+			});
+			await docClient.send(update);
 		},
 		// Retrieve a game from the database
 		get: async (id: string): Promise<Nullable<Game>> => {
-			try {
-				const get = new GetCommand({
-					TableName: config.AWS_DYNAMODB_TABLE,
-					Key: {
-						Id: id,
-					},
-					ConsistentRead: true,
-				});
-				const response = await docClient.send(get);
-				if (response.Item != null) {
-					const game: Game = {
-						id: response.Item.Id,
-						created: new Date(response.Item.Created),
-						active: response.Item.Active,
-						players: response.Item.Players,
-						pending: response.Item.Pending,
-					};
-					if (response.Item.Started) {
-						game.started = new Date(response.Item.Started);
-					}
-					if (response.Item.Stage) {
-						game.stage = response.Item.Stage;
-					}
-					if (response.Item.Activities) {
-						game.activities = response.Item.Activities;
-					}
-					return game;
+			const get = new GetCommand({
+				TableName: config.AWS_DYNAMODB_TABLE,
+				Key: {
+					Id: id,
+				},
+				ConsistentRead: true,
+			});
+			const response = await docClient.send(get);
+			if (response.Item != null) {
+				const game: Game = {
+					id: response.Item.Id,
+					created: new Date(response.Item.Created),
+					active: response.Item.Active,
+					players: response.Item.Players,
+					pending: response.Item.Pending,
+					version: response.Item.Version,
+				};
+				if (response.Item.Started) {
+					game.started = new Date(response.Item.Started);
 				}
-				return null;
-			} catch (e) {
-				useLogger().error(`Unable to retrieve game: ${(e as Error).message}`);
-				throw e;
+				if (response.Item.Stage) {
+					game.stage = response.Item.Stage;
+				}
+				if (response.Item.Activities) {
+					game.activities = response.Item.Activities;
+				}
+				return game;
 			}
+			return null;
 		},
 	};
 

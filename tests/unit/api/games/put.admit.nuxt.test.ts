@@ -237,4 +237,18 @@ describe('Admit API (PUT)', async () => {
 		expect(mockResponseStatus).toBeCalledWith(event, 500);
 		expect(spyError).toBeCalled();
 	});
+
+	it('should return an ErrorResponse (with unexpected error) if something other than DynamoDB fails', async () => {
+		const game = structuredClone(stubGameNew);
+		mockDynamoResponse(game);
+		// @ts-expect-error Type '{ id: string; }' is not assignable to type 'string'.
+		stubParameters({ id: 'Invalid' }, true, stubMayor.id, stubVillager1.id);
+		const spyError = vi.spyOn(console, 'error').mockImplementation(() => null);
+
+		const response = await handler.default(event);
+		expect(response).not.toBeNull();
+		expect(response).toEqual(UnexpectedErrorResponse);
+		expect(mockResponseStatus).toBeCalledWith(event, 500);
+		expect(spyError).toBeCalled();
+	});
 });

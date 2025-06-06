@@ -6,7 +6,7 @@ const requests = ref<Array<JoinRequestEvent>>([]);
 
 export function useWebSocketClient() {
 	const connect = (game: Game, player: Player) => {
-		// We do not want to e creating multiple open sockets
+		// We do not want to be creating multiple open sockets
 		if (socket.value) {
 			useLogger().warn('Attempt to open up a new WebSocket connection when already open');
 			return;

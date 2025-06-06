@@ -117,6 +117,7 @@ interface Game {
 	players: Array<Player>;
 	pending?: Array<Player>;
 	activities?: Array<Activity>;
+	version?: number;
 }
 
 interface Player {

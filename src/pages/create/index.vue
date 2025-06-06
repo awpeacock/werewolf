@@ -60,7 +60,6 @@ const create = async (): Promise<void> => {
 			body: { mayor: nickname.value },
 		})
 			.then((response: Game) => {
-				loading.value = false;
 				status.value.code = response.id;
 				status.value.stage++;
 				sessionStorage.setItem('create', JSON.stringify(status.value));
@@ -69,15 +68,16 @@ const create = async (): Promise<void> => {
 				usePlayerStore().set(game.mayor as Player);
 				// Now setup the connection to listen for notifications
 				useBroadcastClient().connect(game, game.mayor!);
+				loading.value = false;
 			})
 			.catch((e) => {
-				loading.value = false;
 				const response: APIErrorResponse = e.data;
 				if (response?.errors?.[0]?.field) {
 					validationError.value = response.errors[0].message;
 				} else {
 					isSystemError.value = true;
 				}
+				loading.value = false;
 			});
 	}
 };

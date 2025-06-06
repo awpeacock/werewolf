@@ -11,6 +11,7 @@ export const setupRuntimeConfigForApis = () => {
 				AWS_SECRET_ACCESS_KEY: 'AWS_SECRET_ACCESS_KEY',
 				AWS_DYNAMODB_TABLE: 'AWS_DYNAMODB_TABLE',
 				CREATE_MAX_RETRIES: mockRetries,
+				DB_LOCK_MAX_RETRIES: mockRetries,
 				public: {
 					MIN_PLAYERS: mockMinPlayers?.toString(),
 				},

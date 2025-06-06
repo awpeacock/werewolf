@@ -24,8 +24,40 @@ import {
 } from '@/types/constants';
 import { Role } from '@/types/enums';
 
+type UpdateMethod = (_game: Game) => Promise<Game | APIErrorResponse>;
+
 export default defineEventHandler(
 	async (event: H3Event<EventHandlerRequest>): Promise<Game | APIErrorResponse> => {
+		// Optimistic locking for all DB updates
+		const optimisticUpdate = async (id: string, update: UpdateMethod) => {
+			const setting: number = parseInt(useRuntimeConfig().DB_LOCK_MAX_RETRIES);
+			const max: number = setting > 0 ? setting : 10;
+			for (let r = 0; r < max; r++) {
+				const dynamo: DynamoDBWrapper = useDynamoDB(event);
+				const game = await dynamo.get(id);
+				if (!game) {
+					setResponseStatus(event, 404);
+					return GameIdNotFoundErrorResponse;
+				}
+
+				try {
+					return await update(game);
+				} catch (e) {
+					if ((e as Error).name !== 'ConditionalCheckFailedException') {
+						useLogger().error('Error occurred trying to update game:', e as Error);
+						setResponseStatus(event, 500);
+						return UnexpectedErrorResponse;
+					} else {
+						useLogger().warn(`Likely concurrent update received (Attempt ${r + 1})`);
+					}
+				}
+			}
+			// We should only get here if we've exceeded the max retries limit
+			useLogger().error('Exceeded max retries trying to update a game');
+			setResponseStatus(event, 500);
+			return UnexpectedErrorResponse;
+		};
+
 		// Handler for all join requests
 		const handleJoin = async (game: Game) => {
 			const invite = getQuery(event).invite;
@@ -56,10 +88,8 @@ export default defineEventHandler(
 			if (admit) {
 				game.players.push(player);
 			} else {
-				if (!game.pending) {
-					game.pending = [];
-				}
-				game.pending!.push(player);
+				game.pending ??= [];
+				game.pending.push(player);
 			}
 
 			const dynamo: DynamoDBWrapper = useDynamoDB(event);
@@ -205,7 +235,6 @@ export default defineEventHandler(
 			const gameUtil = useGame(game);
 			// Get the latest activity to add to it
 			const activity = gameUtil.getCurrentActivity();
-			const isNew = activity.wolf === null && activity.healer === null;
 
 			// Make sure the player ID matches up to the role
 			const player = gameUtil.findPlayer(body.player);
@@ -218,13 +247,18 @@ export default defineEventHandler(
 				return UnauthorisedErrorResponse;
 			}
 
-			if (isNew) {
-				game.activities?.push(activity);
-			}
-
 			// If both the wolf and healer have now completed their activities,
-			// we need to broadcast the move on to daytime
-			if (activity.wolf !== null && activity.healer !== null) {
+			// we need to broadcast the move on to daytime.  The healer may be dead,
+			// so will never complete their activities - to prevent the game getting
+			// stuck inject an entry that will never match
+			if (gameUtil.isPlayerDead(gameUtil.getHealer()!.id)) {
+				activity.healer = '-';
+			}
+			const waitingForWolf = activity.wolf === null || activity.wolf === undefined;
+			const waitingForHealer =
+				(activity.healer === null || activity.healer === undefined) &&
+				!gameUtil.isPlayerDead(gameUtil.getHealer()!.id);
+			if (!waitingForWolf && !waitingForHealer) {
 				game.stage = 'day';
 				const broadcast = useBroadcast();
 				const payload: MorningEvent = {
@@ -252,11 +286,11 @@ export default defineEventHandler(
 			const gameUtil = useGame(game);
 			// Get the latest activity to add to it
 			const activity = gameUtil.getCurrentActivity();
-			const valid =
-				activity.wolf !== null &&
-				activity.wolf !== undefined &&
-				activity.healer !== null &&
-				activity.healer !== undefined;
+			const waitingForWolf = activity.wolf === null || activity.wolf === undefined;
+			const waitingForHealer =
+				(activity.healer === null || activity.healer === undefined) &&
+				!gameUtil.isPlayerDead(gameUtil.getHealer()!.id);
+			const valid = !waitingForWolf && !waitingForHealer;
 			if (!valid) {
 				setResponseStatus(event, 400);
 				return CannotVoteUntilActivityCompleteErrorReponse;
@@ -281,10 +315,8 @@ export default defineEventHandler(
 			}
 			const player = gameUtil.findPlayer(body.player) as Player;
 			const accused = gameUtil.findPlayer(body.vote) as Player;
-			if (!activity.votes) {
-				activity.votes = {};
-			}
-			if (Object.keys(activity.votes!).includes(body.player)) {
+			activity.votes ??= {};
+			if (Object.keys(activity.votes).includes(body.player)) {
 				setResponseStatus(event, 400);
 				return CannotVoteTwiceErrorReponse;
 			}
@@ -294,7 +326,7 @@ export default defineEventHandler(
 				// Do we move onto the next night, or is the game over (either they guessed
 				// right, or the wolf has won) - let's count up all the votes
 				const count: Record<string, number> = {};
-				for (const id of Object.values(activity.votes as Votes)) {
+				for (const id of Object.values(activity.votes)) {
 					if (!(id in count)) {
 						count[id] = 0;
 					}
@@ -362,36 +394,29 @@ export default defineEventHandler(
 				return response;
 			}
 			const action = getRouterParam(event, 'action');
-			const dynamo: DynamoDBWrapper = useDynamoDB(event);
-			const game = await dynamo.get(id!);
-			if (game) {
-				switch (action) {
-					case 'join': {
-						return await handleJoin(game);
-					}
-					case 'admit': {
-						return await handleAdmit(game);
-					}
-					case 'start': {
-						return await handleStart(game);
-					}
-					case 'night': {
-						return await handleNight(game);
-					}
-					case 'day': {
-						return await handleDay(game);
-					}
-					// case 'reset': {
-					// 	return await handleReset(game);
-					// }
-					default: {
-						setResponseStatus(event, 400);
-						return InvalidActionErrorResponse;
-					}
+			switch (action) {
+				case 'join': {
+					return await optimisticUpdate(id!, (game) => handleJoin(game));
 				}
-			} else {
-				setResponseStatus(event, 404);
-				return GameIdNotFoundErrorResponse;
+				case 'admit': {
+					return await optimisticUpdate(id!, (game) => handleAdmit(game));
+				}
+				case 'start': {
+					return await optimisticUpdate(id!, (game) => handleStart(game));
+				}
+				case 'night': {
+					return await optimisticUpdate(id!, (game) => handleNight(game));
+				}
+				case 'day': {
+					return await optimisticUpdate(id!, (game) => handleDay(game));
+				}
+				// case 'reset': {
+				// 	return await handleReset(game);
+				// }
+				default: {
+					setResponseStatus(event, 400);
+					return InvalidActionErrorResponse;
+				}
 			}
 		} catch (e: unknown) {
 			useLogger().error('Error occurred trying to update game:', e as Error);

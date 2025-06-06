@@ -76,6 +76,12 @@ describe('useGame', () => {
 		expect(mayor).toEqual(stubMayor);
 	});
 
+	it('should successfully return null if a game has no mayor', () => {
+		const game: Game = structuredClone(stubGameBlank);
+		const mayor: Nullable<Player> = useGame(game).getMayor();
+		expect(mayor).toBeNull();
+	});
+
 	it('should successfully extract the wolf from a game (when set)', () => {
 		const game: Game = structuredClone(stubGameActive);
 		const wolf: Nullable<Player> = useGame(game).getWolf();
@@ -88,10 +94,16 @@ describe('useGame', () => {
 		expect(wolf).toBeNull();
 	});
 
-	it('should successfully return null if a game has no mayor', () => {
-		const game: Game = structuredClone(stubGameBlank);
-		const mayor: Nullable<Player> = useGame(game).getMayor();
-		expect(mayor).toBeNull();
+	it('should successfully extract the healer from a game (when set)', () => {
+		const game: Game = structuredClone(stubGameActive);
+		const healer: Nullable<Player> = useGame(game).getHealer();
+		expect(healer).toEqual(stubHealer);
+	});
+
+	it('should successfully return null if trying to extract the healer from a game before it has been set', () => {
+		const game: Game = structuredClone(stubGameNew);
+		const healer: Nullable<Player> = useGame(game).getHealer();
+		expect(healer).toBeNull();
 	});
 
 	it('should successfully return a player that exists in players array (based on nickname)', () => {
