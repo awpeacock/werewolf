@@ -8,7 +8,7 @@ import {
 	stubMayor,
 	stubVillager1,
 	stubVillager3,
-} from '@tests/unit/setup/stubs';
+} from '@tests/common/stubs';
 
 vi.unmock('@/server/util/useWebSocketBroadcast');
 

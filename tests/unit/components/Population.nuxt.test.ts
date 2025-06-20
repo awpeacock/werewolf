@@ -3,7 +3,6 @@ import { mountSuspended } from '@nuxt/test-utils/runtime';
 
 import Population from '@/components/Population.vue';
 
-import { mockT, setLocalePath } from '@tests/unit/setup/i18n';
 import {
 	stubHealer,
 	stubMayor,
@@ -12,7 +11,8 @@ import {
 	stubVillager7,
 	stubVillager8,
 	stubWolf,
-} from '@tests/unit/setup/stubs';
+} from '@tests/common/stubs';
+import { mockT, setLocalePath } from '@tests/unit/setup/i18n';
 
 describe('Population', async () => {
 	beforeEach(() => {

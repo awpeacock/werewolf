@@ -51,7 +51,7 @@ export const useValidation = () => {
 
 	const validateCode = (code: Nullable<Undefinable<string>>): Array<APIError> => {
 		if (code !== null && code !== undefined) {
-			code = code.trim().toUpperCase();
+			code = code.trim();
 		}
 		return validate('code', code);
 	};

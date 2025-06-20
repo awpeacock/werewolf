@@ -3,7 +3,7 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 
 import { createPinia } from 'pinia';
 
-import { stubGameNew } from '@tests/unit/setup/stubs';
+import { stubGameNew } from '@tests/common/stubs';
 
 mockNuxtImport('useEnvironment', () => {
 	return () => {

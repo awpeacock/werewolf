@@ -7,9 +7,6 @@ import {
 	UnexpectedErrorResponse,
 } from '@/types/constants';
 
-import { mockResponseStatus } from '@tests/unit/setup/api';
-import { mockDynamoResponse, setupDynamoWrapperForEvent } from '@tests/unit/setup/dynamodb';
-import { setMockRetries, setupRuntimeConfigForApis } from '@tests/unit/setup/runtime';
 import {
 	stubGameIdNotFound,
 	stubGameInactive,
@@ -24,7 +21,10 @@ import {
 	stubGameUpdateFailure,
 	stubGameConcurrentFailure,
 	stubGameConcurrentRetry,
-} from '@tests/unit/setup/stubs';
+} from '@tests/common/stubs';
+import { mockResponseStatus } from '@tests/unit/setup/api';
+import { mockDynamoResponse, setupDynamoWrapperForEvent } from '@tests/unit/setup/dynamodb';
+import { setMockRetries, setupRuntimeConfigForApis } from '@tests/unit/setup/runtime';
 import { mockWSSend } from '@tests/unit/setup/websocket';
 
 describe('Join API (PUT)', async () => {

@@ -13,7 +13,7 @@ export const setupRuntimeConfigForApis = () => {
 				CREATE_MAX_RETRIES: mockRetries,
 				DB_LOCK_MAX_RETRIES: mockRetries,
 				public: {
-					MIN_PLAYERS: mockMinPlayers?.toString(),
+					MIN_PLAYERS: mockMinPlayers,
 				},
 			};
 		};

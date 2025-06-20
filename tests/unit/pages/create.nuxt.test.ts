@@ -7,11 +7,11 @@ import page from '@/pages/create/index.vue';
 import { useGameStore } from '@/stores/game';
 import { UnexpectedErrorResponse } from '@/types/constants';
 
+import { stubGameNew, stubErrorNickname, stubMayor } from '@tests/common/stubs';
 import { waitFor } from '@tests/unit/setup/global';
 import { server, spyApi } from '@tests/unit/setup/api';
 import { mockT, setLocale } from '@tests/unit/setup/i18n';
 import { mockNavigate, stubNuxtLink } from '@tests/unit/setup/navigation';
-import { stubGameNew, stubErrorNickname, stubMayor } from '@tests/unit/setup/stubs';
 import { mockWSConnect } from '@tests/unit/setup/websocket';
 
 interface UnsafeCreateStatus {

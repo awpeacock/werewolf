@@ -8,8 +8,8 @@ import IconCopy from '@/components/IconCopy.vue';
 import IconMail from '@/components/IconMail.vue';
 import IconShare from '@/components/IconShare.vue';
 
+import { stubGameNew, stubMayor, stubVillager1 } from '@tests/common/stubs';
 import { mockT, setLocale } from '@tests/unit/setup/i18n';
-import { stubGameNew, stubMayor, stubVillager1 } from '@tests/unit/setup/stubs';
 
 describe('Invite page', () => {
 	const mockShare = vi.fn();

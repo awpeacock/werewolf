@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
 
-import { server, spyApi } from '@tests/unit/setup/api';
 import {
 	stubMayor,
 	stubGameNew,
@@ -26,7 +25,8 @@ import {
 	stubGameWolfWin,
 	stubActivityTie,
 	stubActivityIncorrectVotes1,
-} from '@tests/unit/setup/stubs';
+} from '@tests/common/stubs';
+import { server, spyApi } from '@tests/unit/setup/api';
 
 describe('useGame', () => {
 	it('should successfully parse a string based JSON', () => {

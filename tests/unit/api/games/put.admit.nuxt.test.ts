@@ -1,8 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { mockResponseStatus } from '@tests/unit/setup/api';
-import { mockDynamoResponse, setupDynamoWrapperForEvent } from '@tests/unit/setup/dynamodb';
-import { setupRuntimeConfigForApis } from '@tests/unit/setup/runtime';
 import {
 	stubGameInactive,
 	stubMayor,
@@ -14,7 +11,10 @@ import {
 	stubErrorCode,
 	stubVillager2,
 	stubGameUpdateFailure,
-} from '@tests/unit/setup/stubs';
+} from '@tests/common/stubs';
+import { mockResponseStatus } from '@tests/unit/setup/api';
+import { mockDynamoResponse, setupDynamoWrapperForEvent } from '@tests/unit/setup/dynamodb';
+import { setupRuntimeConfigForApis } from '@tests/unit/setup/runtime';
 import {
 	GameIdNotFoundErrorResponse,
 	InvalidActionErrorResponse,

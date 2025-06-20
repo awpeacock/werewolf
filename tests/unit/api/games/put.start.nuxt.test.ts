@@ -9,9 +9,6 @@ import {
 } from '@/types/constants';
 import { Role } from '@/types/enums';
 
-import { mockResponseStatus } from '@tests/unit/setup/api';
-import { mockDynamoResponse, setupDynamoWrapperForEvent } from '@tests/unit/setup/dynamodb';
-import { setupRuntimeConfigForApis } from '@tests/unit/setup/runtime';
 import {
 	stubMayor,
 	stubGameReady,
@@ -22,7 +19,10 @@ import {
 	stubGameInactive,
 	stubVillager1,
 	stubGameUpdateFailure,
-} from '@tests/unit/setup/stubs';
+} from '@tests/common/stubs';
+import { mockResponseStatus } from '@tests/unit/setup/api';
+import { mockDynamoResponse, setupDynamoWrapperForEvent } from '@tests/unit/setup/dynamodb';
+import { setMockMinPlayers, setupRuntimeConfigForApis } from '@tests/unit/setup/runtime';
 import { mockWSSend } from '@tests/unit/setup/websocket';
 
 describe('Start API (PUT)', async () => {
@@ -84,39 +84,44 @@ describe('Start API (PUT)', async () => {
 	it('should take a valid request to start a game', async () => {
 		stubParameters(stubGameReady.id, true, stubMayor.id);
 
-		const response = (await handler.default(event)) as Game;
-		expect(response).toMatchObject({
-			id: stubGameReady.id,
-			active: true,
-			players: expect.arrayContaining(
-				stubGameReady.players.map((p) =>
+		const min: Array<Undefinable<number>> = [undefined, 5];
+		for (const m of min) {
+			setMockMinPlayers(m);
+
+			const response = (await handler.default(event)) as Game;
+			expect(response).toMatchObject({
+				id: stubGameReady.id,
+				active: true,
+				players: expect.arrayContaining(
+					stubGameReady.players.map((p) =>
+						expect.objectContaining({
+							id: p.id,
+							nickname: p.nickname,
+						})
+					)
+				),
+			});
+			expect(mockResponseStatus).toBeCalledWith(event, 200);
+
+			expectAllocation(response);
+
+			// Test that the web socket notification is published
+			for (const player of stubGameReady.players) {
+				expect(mockWSSend).toHaveBeenCalledWith(
+					{
+						game: stubGameReady.id,
+						player: player.id,
+					},
 					expect.objectContaining({
-						id: p.id,
-						nickname: p.nickname,
+						type: 'start-game',
+						game: expect.objectContaining({
+							id: stubGameReady.id,
+							active: true,
+						}),
+						role: expect.toBeOneOf([Role.VILLAGER, Role.WOLF, Role.HEALER]),
 					})
-				)
-			),
-		});
-		expect(mockResponseStatus).toBeCalledWith(event, 200);
-
-		expectAllocation(response);
-
-		// Test that the web socket notification is published
-		for (const player of stubGameReady.players) {
-			expect(mockWSSend).toHaveBeenCalledWith(
-				{
-					game: stubGameReady.id,
-					player: player.id,
-				},
-				expect.objectContaining({
-					type: 'start-game',
-					game: expect.objectContaining({
-						id: stubGameReady.id,
-						active: true,
-					}),
-					role: expect.toBeOneOf([Role.VILLAGER, Role.WOLF, Role.HEALER]),
-				})
-			);
+				);
+			}
 		}
 	});
 

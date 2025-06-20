@@ -12,9 +12,6 @@ import {
 	UnexpectedErrorResponse,
 } from '@/types/constants';
 
-import { mockResponseStatus } from '@tests/unit/setup/api';
-import { mockDynamoResponse, setupDynamoWrapperForEvent } from '@tests/unit/setup/dynamodb';
-import { setupRuntimeConfigForApis } from '@tests/unit/setup/runtime';
 import {
 	stubActivityIncorrectVotes1,
 	stubErrorCode,
@@ -32,7 +29,10 @@ import {
 	stubVillager7,
 	stubVillager8,
 	stubWolf,
-} from '@tests/unit/setup/stubs';
+} from '@tests/common/stubs';
+import { mockResponseStatus } from '@tests/unit/setup/api';
+import { mockDynamoResponse, setupDynamoWrapperForEvent } from '@tests/unit/setup/dynamodb';
+import { setupRuntimeConfigForApis } from '@tests/unit/setup/runtime';
 import { mockWSSend } from '@tests/unit/setup/websocket';
 
 describe('Day API (PUT)', async () => {

@@ -5,8 +5,8 @@ import type { ServerResponse } from 'http';
 import { IncomingMessage } from 'http';
 import type { ChannelAuthResponse } from 'pusher';
 
+import { stubGameNew, stubMayor } from '@tests/common/stubs';
 import { mockResponseStatus } from '@tests/unit/setup/api';
-import { stubGameNew, stubMayor } from '@tests/unit/setup/stubs';
 
 describe('Pusher Auth API', async () => {
 	const spyError = vi.spyOn(console, 'error').mockImplementation(() => {});

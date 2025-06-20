@@ -2,16 +2,16 @@ import { beforeEach, describe, expect, it, vi, beforeAll } from 'vitest';
 
 import { NoUniqueIdErrorResponse, UnexpectedErrorResponse } from '@/types/constants';
 
-import { mockResponseStatus } from '@tests/unit/setup/api';
-import { setupDynamoWrapperForEvent } from '@tests/unit/setup/dynamodb';
-import { setMockRetries, setupRuntimeConfigForApis } from '@tests/unit/setup/runtime';
 import {
 	stubGameNew,
 	stubMayor,
 	stubErrorNickname,
 	stubGameIdDuplicateError,
 	stubGameIdPutError,
-} from '@tests/unit/setup/stubs';
+} from '@tests/common/stubs';
+import { mockResponseStatus } from '@tests/unit/setup/api';
+import { setupDynamoWrapperForEvent } from '@tests/unit/setup/dynamodb';
+import { setMockRetries, setupRuntimeConfigForApis } from '@tests/unit/setup/runtime';
 
 describe('Games API (POST)', async () => {
 	// This is to catch the DynamoDB initialisation message

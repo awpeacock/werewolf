@@ -6,10 +6,10 @@ import {
 	UnexpectedErrorResponse,
 } from '@/types/constants';
 
+import { stubGameIdGetError, stubGameIdNotFound, stubGameNew } from '@tests/common/stubs';
 import { mockResponseStatus } from '@tests/unit/setup/api';
 import { setupDynamoWrapperForEvent } from '@tests/unit/setup/dynamodb';
 import { setupRuntimeConfigForApis } from '@tests/unit/setup/runtime';
-import { stubGameIdGetError, stubGameIdNotFound, stubGameNew } from '@tests/unit/setup/stubs';
 
 describe('Games API (GET)', async () => {
 	// This is to catch the DynamoDB initialisation message

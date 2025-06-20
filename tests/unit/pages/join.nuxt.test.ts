@@ -7,9 +7,6 @@ import page from '@/pages/join/[[id]].vue';
 import { useGameStore } from '@/stores/game';
 import { GameIdNotFoundErrorResponse, UnexpectedErrorResponse } from '@/types/constants';
 
-import { waitFor } from '@tests/unit/setup/global';
-import { server, spyApi } from '@tests/unit/setup/api';
-import { mockT, setLocale } from '@tests/unit/setup/i18n';
 import {
 	stubErrorCode,
 	stubErrorNickname,
@@ -19,7 +16,10 @@ import {
 	stubPlayerBlank,
 	stubVillager1,
 	stubVillager2,
-} from '@tests/unit/setup/stubs';
+} from '@tests/common/stubs';
+import { waitFor } from '@tests/unit/setup/global';
+import { server, spyApi } from '@tests/unit/setup/api';
+import { mockT, setLocale } from '@tests/unit/setup/i18n';
 import { mockWSDisconnect, mockWSLatest } from '@tests/unit/setup/websocket';
 
 describe('Join Game page', () => {

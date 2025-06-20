@@ -59,6 +59,7 @@ export default defineNuxtConfig({
 	},
 	alias: {
 		'@': path.resolve(__dirname, 'src'),
+		'@tests': path.resolve(__dirname, 'tests'),
 	},
 	css: ['@/assets/css/main.css'],
 	i18n: {

@@ -1,5 +1,8 @@
 import { Role } from '@/types/enums';
 
+export const stubNameDuplicate = 'Duplicate Name';
+export const stubNameError = 'Error Name';
+
 export const stubPlayerBlank: Player = {
 	id: '',
 	nickname: '',
@@ -86,13 +89,6 @@ stubVotesTie[stubMayor.id] = stubVillager6.id;
 stubVotesTie[stubWolf.id] = stubVillager6.id;
 stubVotesTie[stubHealer.id] = stubVillager7.id;
 
-export const stubVotesDeadHealer: Votes = {};
-stubVotesDeadHealer[stubVillager6.id] = stubVillager7.id;
-stubVotesDeadHealer[stubVillager7.id] = stubWolf.id;
-stubVotesDeadHealer[stubVillager8.id] = stubWolf.id;
-stubVotesDeadHealer[stubMayor.id] = stubVillager6.id;
-stubVotesDeadHealer[stubWolf.id] = stubVillager6.id;
-
 export const stubVotesWolf1: Votes = {};
 stubVotesWolf1[stubVillager8.id] = stubMayor.id;
 stubVotesWolf1[stubMayor.id] = stubVillager8.id;
@@ -103,9 +99,33 @@ export const stubVotesWolf2: Votes = {};
 stubVotesWolf2[stubWolf.id] = stubHealer.id;
 stubVotesWolf2[stubHealer.id] = stubVillager8.id;
 
+export const stubVotesComplete1: Votes = {};
+stubVotesComplete1[stubMayor.id] = stubVillager8.id;
+stubVotesComplete1[stubWolf.id] = stubHealer.id;
+stubVotesComplete1[stubHealer.id] = stubWolf.id;
+stubVotesComplete1[stubVillager6.id] = stubHealer.id;
+stubVotesComplete1[stubVillager7.id] = stubVillager6.id;
+stubVotesComplete1[stubVillager8.id] = stubHealer.id;
+
+export const stubVotesComplete2: Votes = {};
+stubVotesComplete1[stubMayor.id] = stubWolf.id;
+stubVotesComplete1[stubWolf.id] = stubVillager7.id;
+stubVotesComplete1[stubVillager7.id] = stubWolf.id;
+stubVotesComplete1[stubVillager8.id] = stubWolf.id;
+
 export const stubActivityBlank: Activity = {
 	wolf: null,
 	healer: null,
+	votes: {},
+};
+export const stubActivityWolfOnly: Activity = {
+	wolf: stubVillager6.id,
+	healer: null,
+	votes: {},
+};
+export const stubActivityHealerOnly: Activity = {
+	wolf: null,
+	healer: stubVillager6.id,
 	votes: {},
 };
 export const stubActivitySaved1: Activity = {
@@ -168,10 +188,25 @@ export const stubActivitiesWolfWin: Array<Activity> = [
 		votes: stubVotesWolf2,
 	},
 ];
+export const stubActivitiesComplete: Array<Activity> = [
+	{
+		wolf: stubVillager7.id,
+		healer: stubVillager7.id,
+		votes: stubVotesComplete1,
+		evicted: stubHealer.id,
+	},
+	{
+		wolf: stubVillager6.id,
+		votes: stubVotesComplete2,
+		evicted: stubWolf.id,
+	},
+];
 
 export const stubGameIdPutError = 'PUTF';
 export const stubGameIdDuplicateError = 'DUPE';
 export const stubGameIdUpdateError = 'UPDF';
+export const stubGameIdUpdateErrorNight = 'UPDN';
+export const stubGameIdUpdateErrorDay = 'UPDD';
 export const stubGameIdConcurrentUpdateError = 'CONC';
 export const stubGameIdConcurrentUpdateRetry = 'RETR';
 export const stubGameIdGetError = 'GETF';
@@ -188,6 +223,7 @@ export const stubGameNew: Game = {
 	created: new Date(),
 	active: false,
 	players: [stubMayor],
+	version: 1,
 };
 export const stubGamePending: Game = {
 	id: 'C3D4',
@@ -195,6 +231,7 @@ export const stubGamePending: Game = {
 	active: false,
 	players: [stubMayor],
 	pending: [stubVillager1],
+	version: 2,
 };
 export const stubGameInactive: Game = {
 	id: 'E5F6',
@@ -202,6 +239,7 @@ export const stubGameInactive: Game = {
 	active: false,
 	players: [stubMayor, stubVillager1],
 	activities: [],
+	version: 3,
 };
 export const stubGameReady: Game = {
 	id: 'G7H8',
@@ -209,6 +247,7 @@ export const stubGameReady: Game = {
 	active: false,
 	players: [stubMayor, stubVillager1, stubVillager2, stubVillager3, stubVillager4, stubVillager5],
 	activities: [],
+	version: 10,
 };
 export const stubGameActive: Game = {
 	id: 'I9J0',
@@ -218,62 +257,108 @@ export const stubGameActive: Game = {
 	stage: 'night',
 	players: [stubMayor, stubVillager6, stubVillager7, stubVillager8, stubWolf, stubHealer],
 	activities: [],
+	version: 11,
 };
-export const stubGameIncompleteActivity: Game = {
+export const stubGameWolfOnly: Game = {
 	id: 'K0L9',
 	created: new Date(),
+	started: new Date(),
+	active: true,
+	stage: 'night',
+	players: [stubMayor, stubVillager6, stubVillager7, stubVillager8, stubWolf, stubHealer],
+	activities: [stubActivityWolfOnly],
+	version: 12,
+};
+export const stubGameHealerOnly: Game = {
+	id: 'M8N7',
+	created: new Date(),
+	started: new Date(),
+	active: true,
+	stage: 'night',
+	players: [stubMayor, stubVillager6, stubVillager7, stubVillager8, stubWolf, stubHealer],
+	activities: [stubActivityHealerOnly],
+	version: 12,
+};
+export const stubGameIncompleteActivity: Game = {
+	id: 'O6P5',
+	created: new Date(),
+	started: new Date(),
 	active: true,
 	stage: 'day',
 	players: [stubMayor, stubVillager6, stubVillager7, stubVillager8, stubWolf, stubHealer],
 	activities: [stubActivityNotSaved1],
+	version: 13,
 };
 export const stubGameIncorrectVotes1: Game = {
-	id: 'M8N7',
-	created: new Date(),
-	active: true,
-	stage: 'day',
-	players: [stubMayor, stubVillager6, stubVillager7, stubVillager8, stubWolf, stubHealer],
-	activities: [stubActivityIncorrectVotes1],
-};
-export const stubGameIncorrectVotes2: Game = {
-	id: 'M8N7',
-	created: new Date(),
-	active: true,
-	stage: 'day',
-	players: [stubMayor, stubVillager6, stubVillager7, stubVillager8, stubWolf, stubHealer],
-	activities: [stubActivityIncorrectVotes2],
-};
-export const stubGameCorrectVotes: Game = {
-	id: 'O6P5',
-	created: new Date(),
-	active: true,
-	stage: 'day',
-	players: [stubMayor, stubVillager6, stubVillager7, stubVillager8, stubWolf, stubHealer],
-	activities: [stubActivityCorrectVotes],
-};
-export const stubGameTie: Game = {
 	id: 'Q4R3',
 	created: new Date(),
 	active: true,
 	stage: 'day',
 	players: [stubMayor, stubVillager6, stubVillager7, stubVillager8, stubWolf, stubHealer],
+	activities: [stubActivityIncorrectVotes1],
+	version: 14,
+};
+export const stubGameIncorrectVotes2: Game = {
+	id: 'S2T1',
+	created: new Date(),
+	started: new Date(),
+	active: true,
+	stage: 'day',
+	players: [stubMayor, stubVillager6, stubVillager7, stubVillager8, stubWolf, stubHealer],
+	activities: [stubActivityIncorrectVotes2],
+	version: 15,
+};
+export const stubGameCorrectVotes: Game = {
+	id: 'U0V1',
+	created: new Date(),
+	started: new Date(),
+	active: true,
+	stage: 'day',
+	players: [stubMayor, stubVillager6, stubVillager7, stubVillager8, stubWolf, stubHealer],
+	activities: [stubActivityCorrectVotes],
+	version: 16,
+};
+export const stubGameTie: Game = {
+	id: 'W2X3',
+	created: new Date(),
+	started: new Date(),
+	active: true,
+	stage: 'day',
+	players: [stubMayor, stubVillager6, stubVillager7, stubVillager8, stubWolf, stubHealer],
 	activities: [stubActivityTie],
+	version: 17,
 };
 export const stubGameDeadHealer: Game = {
-	id: 'S2T1',
+	id: 'Y4Z5',
 	created: new Date(),
 	active: true,
 	stage: 'night',
 	players: [stubMayor, stubVillager6, stubVillager7, stubVillager8, stubWolf, stubHealer],
 	activities: [stubActivityDeadHealer],
+	version: 18,
 };
 export const stubGameWolfWin: Game = {
-	id: 'U0V1',
+	id: '6A7B',
 	created: new Date(),
+	started: new Date(),
 	active: true,
 	stage: 'day',
 	players: [stubMayor, stubVillager6, stubVillager7, stubVillager8, stubWolf, stubHealer],
 	activities: stubActivitiesWolfWin,
+	version: 19,
+};
+export const stubGameComplete: Game = {
+	id: '8C9D',
+	created: new Date(),
+	started: new Date(),
+	finished: new Date(),
+	active: false,
+	stage: 'day',
+	players: [stubMayor, stubVillager6, stubVillager7, stubVillager8, stubWolf, stubHealer],
+	pending: [],
+	activities: stubActivitiesComplete,
+	winner: 'village',
+	version: 20,
 };
 export const stubGamePutFailure: Game = {
 	id: stubGameIdPutError,
@@ -294,6 +379,7 @@ export const stubGameConcurrentFailure: Game = {
 	active: false,
 	players: [stubMayor, stubWolf, stubHealer, stubVillager6, stubVillager7, stubVillager8],
 	pending: [stubVillager1],
+	version: 1,
 };
 export const stubGameConcurrentRetry: Game = {
 	id: stubGameIdConcurrentUpdateRetry,
@@ -301,6 +387,7 @@ export const stubGameConcurrentRetry: Game = {
 	active: false,
 	players: [stubMayor, stubWolf, stubHealer, stubVillager6, stubVillager7, stubVillager8],
 	pending: [stubVillager1],
+	version: 1,
 };
 
 export const stubErrorCode: APIErrorResponse = {
@@ -308,4 +395,10 @@ export const stubErrorCode: APIErrorResponse = {
 };
 export const stubErrorNickname: APIErrorResponse = {
 	errors: [{ field: 'nickname', message: 'nickname-min' }],
+};
+export const stubErrorCodeAndNickname: APIErrorResponse = {
+	errors: [
+		{ field: 'code', message: 'code-required' },
+		{ field: 'nickname', message: 'nickname-min' },
+	],
 };

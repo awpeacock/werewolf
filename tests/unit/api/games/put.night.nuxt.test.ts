@@ -9,9 +9,6 @@ import {
 } from '@/types/constants';
 import { Role } from '@/types/enums';
 
-import { mockResponseStatus } from '@tests/unit/setup/api';
-import { mockDynamoResponse, setupDynamoWrapperForEvent } from '@tests/unit/setup/dynamodb';
-import { setupRuntimeConfigForApis } from '@tests/unit/setup/runtime';
 import {
 	stubErrorCode,
 	stubGameIdNotFound,
@@ -25,7 +22,10 @@ import {
 	stubGameUpdateFailure,
 	stubGameCorrectVotes,
 	stubGameDeadHealer,
-} from '@tests/unit/setup/stubs';
+} from '@tests/common/stubs';
+import { mockResponseStatus } from '@tests/unit/setup/api';
+import { mockDynamoResponse, setupDynamoWrapperForEvent } from '@tests/unit/setup/dynamodb';
+import { setupRuntimeConfigForApis } from '@tests/unit/setup/runtime';
 import { mockWSSend } from '@tests/unit/setup/websocket';
 
 describe('Night API (PUT)', async () => {
@@ -263,7 +263,6 @@ describe('Night API (PUT)', async () => {
 				stubParameters(stubGameDeadHealer.id, true, Role.WOLF, w, v);
 
 				const response = (await handler.default(event)) as Game;
-				console.info(response);
 				expect(response).toMatchObject({
 					id: stubGameDeadHealer.id,
 					active: true,

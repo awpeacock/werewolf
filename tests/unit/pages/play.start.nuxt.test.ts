@@ -1,20 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mountSuspended } from '@nuxt/test-utils/runtime';
 import { flushPromises, type VueWrapper } from '@vue/test-utils';
 import { http, HttpResponse } from 'msw';
 
-import { setMockMinPlayers, setupRuntimeConfigForApis } from '../setup/runtime';
-
-import DefaultLayout from '@/layouts/default.vue';
-import page from '@/pages/play/[[id]].vue';
-import { GameIdNotFoundErrorResponse, UnauthorisedErrorResponse } from '@/types/constants';
-import { Role } from '@/types/enums';
-
-import { waitFor } from '@tests/unit/setup/global';
-import { server, spyApi } from '@tests/unit/setup/api';
-import { mockGame } from '@tests/unit/setup/game';
-import { mockT, mockUseLocalePath, setLocale } from '@tests/unit/setup/i18n';
-import { mockNavigate, stubNuxtLink } from '@tests/unit/setup/navigation';
 import {
 	stubGameActive,
 	stubGameInactive,
@@ -30,10 +18,19 @@ import {
 	stubVillager7,
 	stubVillager8,
 	stubWolf,
-} from '@tests/unit/setup/stubs';
+} from '@tests/common/stubs';
+import { waitFor } from '@tests/unit/setup/global';
+import { server, spyApi } from '@tests/unit/setup/api';
+import { mockGame } from '@tests/unit/setup/game';
+import { mockT, mockUseLocalePath, setLocale } from '@tests/unit/setup/i18n';
+import { mockNavigate, stubNuxtLink } from '@tests/unit/setup/navigation';
+import { setMockMinPlayers, setupRuntimeConfigForApis } from '@tests/unit/setup/runtime';
 import { mockWSLatest } from '@tests/unit/setup/websocket';
 
-setupRuntimeConfigForApis();
+import DefaultLayout from '@/layouts/default.vue';
+import page from '@/pages/play/[[id]].vue';
+import { Role } from '@/types/enums';
+import { GameIdNotFoundErrorResponse, UnauthorisedErrorResponse } from '@/types/constants';
 
 describe('Play Game (Start Game) page', () => {
 	const storeGame = useGameStore();
@@ -91,6 +88,10 @@ describe('Play Game (Start Game) page', () => {
 			expect(spyApi).not.toHaveBeenCalled();
 		}
 	};
+
+	beforeAll(() => {
+		setupRuntimeConfigForApis();
+	});
 
 	beforeEach(() => {
 		sessionStorage.clear();
@@ -443,15 +444,19 @@ describe('Play Game (Start Game) page', () => {
 	it.each(['en', 'de'])(
 		'should not allow the mayor to click the "Start Game" button if the minimum number of players (unconfigured) have not joined',
 		async (locale: string) => {
-			setMockMinPlayers(undefined);
-			storeGame.set(stubGameInactive);
-			mockGame.getLatest = vi.fn().mockReturnValue(stubGameInactive);
-			storePlayer.set(stubMayor);
-			const wrapper = await setupPage(locale, '/play/' + stubGameInactive.id);
+			const min: Array<Undefinable<number>> = [undefined, 5];
+			for (const m of min) {
+				setMockMinPlayers(m);
 
-			await triggerStart(wrapper, stubGameInactive.id, stubMayor, false);
+				storeGame.set(stubGameInactive);
+				mockGame.getLatest = vi.fn().mockReturnValue(stubGameInactive);
+				storePlayer.set(stubMayor);
+				const wrapper = await setupPage(locale, '/play/' + stubGameInactive.id);
 
-			expect(wrapper.text()).toContain(`welcome-to-lycanville (${locale})`);
+				await triggerStart(wrapper, stubGameInactive.id, stubMayor, false);
+
+				expect(wrapper.text()).toContain(`welcome-to-lycanville (${locale})`);
+			}
 		}
 	);
 

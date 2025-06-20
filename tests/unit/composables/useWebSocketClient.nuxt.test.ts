@@ -7,7 +7,7 @@ import {
 	stubVillager1,
 	stubVillager2,
 	stubVillager3,
-} from '../setup/stubs';
+} from '@tests/common/stubs';
 import { MockWebSocket } from '@tests/unit/setup/websocket';
 
 describe('useWebSocketClient', async () => {

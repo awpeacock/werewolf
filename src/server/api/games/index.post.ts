@@ -1,9 +1,9 @@
 import type { H3Event, EventHandlerRequest } from 'h3';
 import { v4 as uuidv4 } from 'uuid';
 
-import { useDynamoDB } from '@/composables/useDynamoDB';
 import { useLogger } from '@/composables/useLogger';
 import { useValidation } from '@/composables/useValidation';
+import { useDynamoDB } from '@/server/util/useDynamoDB';
 import { Role } from '@/types/enums';
 import { NoUniqueIdErrorResponse, UnexpectedErrorResponse } from '@/types/constants';
 

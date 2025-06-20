@@ -5,7 +5,7 @@ import { createPinia, setActivePinia } from 'pinia';
 
 import plugin from '@/plugins/rehydrate.client';
 
-import { stubGameInactive, stubPlayerBlank, stubVillager1 } from '@tests/unit/setup/stubs';
+import { stubGameInactive, stubPlayerBlank, stubVillager1 } from '@tests/common/stubs';
 import { MockWebSocket, mockWSConnect } from '@tests/unit/setup/websocket';
 
 const mockGame = {

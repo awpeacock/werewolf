@@ -1,7 +1,7 @@
 import type { H3Event, EventHandlerRequest } from 'h3';
 
-import { useDynamoDB } from '@/composables/useDynamoDB';
 import { useLogger } from '@/composables/useLogger';
+import { useDynamoDB } from '@/server/util/useDynamoDB';
 import {
 	GameIdNotFoundErrorResponse,
 	InvalidGameIdErrorResponse,

@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 
-import { stubHealer, stubVillager1, stubVillager6, stubWolf } from '@tests/unit/setup/stubs';
 import { Role } from '@/types/enums';
+
+import { stubHealer, stubVillager1, stubVillager6, stubWolf } from '@tests/common/stubs';
 
 mockNuxtImport('useEnvironment', () => {
 	return () => {

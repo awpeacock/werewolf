@@ -5,7 +5,6 @@ import { flushPromises, RouterLinkStub, type VueWrapper } from '@vue/test-utils'
 import page from '@/pages/index.vue';
 import { useGameStore } from '@/stores/game';
 
-import { mockT, setLocale } from '@tests/unit/setup/i18n';
 import {
 	stubGameActive,
 	stubGameBlank,
@@ -14,7 +13,8 @@ import {
 	stubPlayerBlank,
 	stubVillager1,
 	stubVillager2,
-} from '@tests/unit/setup/stubs';
+} from '@tests/common/stubs';
+import { mockT, setLocale } from '@tests/unit/setup/i18n';
 
 describe('Home page', () => {
 	const game = useGameStore();

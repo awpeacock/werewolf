@@ -8,11 +8,6 @@ import BouncingDots from '@/components/BouncingDots.vue';
 import { GameIdNotFoundErrorResponse, UnauthorisedErrorResponse } from '@/types/constants';
 import { Role } from '@/types/enums';
 
-import { waitFor } from '@tests/unit/setup/global';
-import { server, spyApi } from '@tests/unit/setup/api';
-import { mockGame } from '@tests/unit/setup/game';
-import { mockT, setLocale } from '@tests/unit/setup/i18n';
-import { stubNuxtLink } from '@tests/unit/setup/navigation';
 import {
 	stubGameActive,
 	stubHealer,
@@ -21,7 +16,12 @@ import {
 	stubVillager7,
 	stubVillager8,
 	stubWolf,
-} from '@tests/unit/setup/stubs';
+} from '@tests/common/stubs';
+import { waitFor } from '@tests/unit/setup/global';
+import { server, spyApi } from '@tests/unit/setup/api';
+import { mockGame } from '@tests/unit/setup/game';
+import { mockT, setLocale } from '@tests/unit/setup/i18n';
+import { stubNuxtLink } from '@tests/unit/setup/navigation';
 import { setupRuntimeConfigForApis } from '@tests/unit/setup/runtime';
 import { mockWSLatest } from '@tests/unit/setup/websocket';
 
@@ -167,6 +167,7 @@ describe('Play Game (Night time) page', () => {
 
 				await wrapper.find('button').trigger('click');
 				await flushPromises();
+				await nextTick();
 
 				const game = structuredClone(stubGameActive);
 				game.activities?.push({
@@ -203,6 +204,7 @@ describe('Play Game (Night time) page', () => {
 
 				await wrapper.find('button').trigger('click');
 				await flushPromises();
+				await nextTick();
 
 				const game = structuredClone(stubGameActive);
 				game.activities?.push({
@@ -216,7 +218,7 @@ describe('Play Game (Night time) page', () => {
 				await flushPromises();
 				await nextTick();
 
-				expect(wrapper.text()).toContain(`activity-summary-saved (${locale})`);
+				await waitFor(() => wrapper.text().includes(`activity-summary-saved (${locale})`));
 			}
 		}
 	);
@@ -232,6 +234,7 @@ describe('Play Game (Night time) page', () => {
 
 				await wrapper.find('button').trigger('click');
 				await flushPromises();
+				await nextTick();
 
 				const game = structuredClone(stubGameActive);
 				game.activities?.push({
@@ -245,8 +248,12 @@ describe('Play Game (Night time) page', () => {
 				await flushPromises();
 				await nextTick();
 
-				expect(wrapper.text()).toContain(
-					`activity-summary-not-saved {victim: ${stubGameActive.players.at(0)!.nickname}}  (${locale})`
+				await waitFor(() =>
+					wrapper
+						.text()
+						.includes(
+							`activity-summary-not-saved {victim: ${stubGameActive.players.at(0)!.nickname}}  (${locale})`
+						)
 				);
 			}
 		}

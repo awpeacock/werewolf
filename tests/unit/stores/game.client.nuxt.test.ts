@@ -11,7 +11,7 @@ import {
 	stubMayor,
 	stubVillager1,
 	stubVillager2,
-} from '@tests/unit/setup/stubs';
+} from '@tests/common/stubs';
 
 mockNuxtImport('useEnvironment', () => {
 	return () => {
@@ -63,7 +63,8 @@ describe('Game Pinia Store', () => {
 
 		expect(store.$state).toEqual(expected);
 		expect(sessionStorage.setItem).toBeCalled();
-		expect(sessionStorage.getItem('game')!).toEqual(JSON.stringify(expected));
+		const stored = JSON.parse(sessionStorage.getItem('game')!);
+		expect(stored).toEqualGame(expected);
 	});
 
 	it('should return the mayor of the stored game', async () => {

@@ -1,6 +1,6 @@
 {
 	"name": "werewolf-game",
-	"version": "0.0.4",
+	"version": "0.0.5",
 	"description": "A website version of the party game.",
 	"private": true,
 	"type": "module",
@@ -19,7 +19,9 @@
 		"lint:fix": "eslint . --fix",
 		"format": "prettier --write .",
 		"pretest": "npm run setup --env=test",
-		"test": "vitest --coverage",
+		"test": "npm run test:unit && npm run test:integration",
+		"test:unit": "vitest --config ./vitest.unit.config.ts --coverage --run tests/unit",
+		"test:integration": "cross-env IS_INTEGRATION=true vitest --config ./vitest.integration.config.ts --run tests/integration",
 		"posttest": "npm run destroy --env=test"
 	},
 	"author": "Alasdair Peacock",

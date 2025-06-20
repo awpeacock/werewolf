@@ -22,7 +22,7 @@ import {
 	stubGameNew,
 	stubGamePending,
 	stubGameReady,
-} from '@tests/unit/setup/stubs';
+} from '@tests/common/stubs';
 
 vi.mock('@aws-sdk/client-dynamodb', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('@aws-sdk/client-dynamodb')>();
@@ -153,11 +153,13 @@ vi.mock('@aws-sdk/lib-dynamodb', () => {
 								Id: structuredClone(response.id),
 								Created: structuredClone(response.created),
 								Started: structuredClone(response.started),
+								Finished: structuredClone(response.finished),
 								Active: structuredClone(response.active),
 								Players: structuredClone(response.players),
 								Pending: structuredClone(response.pending),
 								Stage: structuredClone(response.stage),
 								Activities: structuredClone(response.activities),
+								Version: structuredClone(response.version),
 							},
 						});
 					}

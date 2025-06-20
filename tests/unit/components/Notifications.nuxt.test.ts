@@ -5,8 +5,6 @@ import { http, HttpResponse } from 'msw';
 
 import Notifications from '@/components/Notifications.vue';
 
-import { server, spyApi } from '@tests/unit/setup/api';
-import { mockT, setLocalePath } from '@tests/unit/setup/i18n';
 import {
 	stubGameInactive,
 	stubGameNew,
@@ -14,7 +12,9 @@ import {
 	stubMayor,
 	stubVillager1,
 	stubVillager2,
-} from '@tests/unit/setup/stubs';
+} from '@tests/common/stubs';
+import { server, spyApi } from '@tests/unit/setup/api';
+import { mockT, setLocalePath } from '@tests/unit/setup/i18n';
 import { mockWSLatest, mockWSRemove } from '@tests/unit/setup/websocket';
 
 describe('Notifications', async () => {

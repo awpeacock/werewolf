@@ -11,7 +11,7 @@ import {
 	stubVillager2,
 	stubVillager3,
 	stubVillager4,
-} from '@tests/unit/setup/stubs';
+} from '@tests/common/stubs';
 
 const mockPusherInstance = {
 	connection: {

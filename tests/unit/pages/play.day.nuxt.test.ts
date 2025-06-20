@@ -7,11 +7,6 @@ import page from '@/pages/play/[[id]].vue';
 import BouncingDots from '@/components/BouncingDots.vue';
 import { GameIdNotFoundErrorResponse, UnauthorisedErrorResponse } from '@/types/constants';
 
-import { waitFor } from '@tests/unit/setup/global';
-import { server, spyApi } from '@tests/unit/setup/api';
-import { mockGame } from '@tests/unit/setup/game';
-import { mockT, setLocale } from '@tests/unit/setup/i18n';
-import { stubNuxtLink } from '@tests/unit/setup/navigation';
 import {
 	stubGameCorrectVotes,
 	stubGameIncompleteActivity,
@@ -26,7 +21,12 @@ import {
 	stubVillager8,
 	stubVotesTie,
 	stubWolf,
-} from '@tests/unit/setup/stubs';
+} from '@tests/common/stubs';
+import { waitFor } from '@tests/unit/setup/global';
+import { server, spyApi } from '@tests/unit/setup/api';
+import { mockGame } from '@tests/unit/setup/game';
+import { mockT, setLocale } from '@tests/unit/setup/i18n';
+import { stubNuxtLink } from '@tests/unit/setup/navigation';
 import { setupRuntimeConfigForApis } from '@tests/unit/setup/runtime';
 import { mockWSLatest } from '@tests/unit/setup/websocket';
 

@@ -8,7 +8,7 @@ import {
 	stubGamePending,
 	stubMayor,
 	stubVillager1,
-} from '@tests/unit/setup/stubs';
+} from '@tests/common/stubs';
 
 const mockPusherInstance = {
 	trigger: vi.fn(),

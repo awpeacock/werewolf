@@ -4,14 +4,9 @@ import type { NitroApp } from 'nitropack';
 import type { H3Event, EventHandlerRequest } from 'h3';
 
 import {
-	mockDynamoGet,
-	mockDynamoPut,
-	mockDynamoResponse,
-	mockDynamoUpdate,
-} from '@tests/unit/setup/dynamodb';
-import {
 	stubActivityIncorrectVotes1,
 	stubGameActive,
+	stubGameComplete,
 	stubGameIdGetError,
 	stubGameIdNotFound,
 	stubGameInactive,
@@ -19,7 +14,13 @@ import {
 	stubGamePending,
 	stubGamePutFailure,
 	stubGameUpdateFailure,
-} from '@tests/unit/setup/stubs';
+} from '@tests/common/stubs';
+import {
+	mockDynamoGet,
+	mockDynamoPut,
+	mockDynamoResponse,
+	mockDynamoUpdate,
+} from '@tests/unit/setup/dynamodb';
 
 vi.stubGlobal('defineNitroPlugin', (plugin: unknown) => plugin);
 
@@ -155,12 +156,22 @@ describe('DynamoDB Nitro Plugin', async () => {
 					Key: { Id: stubGameActive.id },
 				})
 			);
-
 			expect(active.started).toEqual(stubGameActive.started);
 			expect(active.active).toBeTruthy();
 			expect(active.players).toEqual(stubGameActive.players);
 			expect(active.stage).toEqual(stubGameActive.stage);
 			expect(active.activities).toEqual(stubGameActive.activities);
+
+			mockDynamoResponse(stubGameComplete);
+			const complete: Game = (await dynamo.get(stubGameComplete.id)) as Game;
+			expect(mockDynamoGet).toHaveBeenCalled();
+			expect(mockDynamoGet).toHaveBeenCalledWith(
+				expect.objectContaining({
+					TableName: expect.any(String),
+					Key: { Id: stubGameComplete.id },
+				})
+			);
+			expect(complete.finished).toEqual(stubGameComplete.finished);
 
 			const pending = await dynamo.get(stubGamePending.id);
 			expect(pending!.pending).toEqual(stubGamePending.pending);
@@ -180,7 +191,7 @@ describe('DynamoDB Nitro Plugin', async () => {
 		expect(log).not.toHaveBeenCalled();
 
 		await expect(dynamo.update(stubGameUpdateFailure)).rejects.toThrow(
-			'Simulated "update" failure'
+			'Cannot update a game without a version'
 		);
 		expect(log).not.toHaveBeenCalled();
 

@@ -4,9 +4,9 @@ import { mountSuspended } from '@nuxt/test-utils/runtime';
 
 import DefaultLayout from '@/layouts/default.vue';
 
+import { stubGameActive, stubWolf } from '@tests/common/stubs';
 import { mockT } from '@tests/unit/setup/i18n';
 import { stubNuxtLink } from '@tests/unit/setup/navigation';
-import { stubGameActive, stubWolf } from '@tests/unit/setup/stubs';
 
 describe('Default layout', async () => {
 	it('should mount successfully, delaying loading', async () => {

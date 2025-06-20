@@ -1,11 +1,11 @@
 import type { H3Event, EventHandlerRequest } from 'h3';
 import { v4 as uuidv4 } from 'uuid';
 
-import { useDynamoDB } from '@/composables/useDynamoDB';
 import { useGame } from '@/composables/useGame';
 import { useLogger } from '@/composables/useLogger';
 import { useValidation } from '@/composables/useValidation';
 import { useBroadcast } from '@/server/util/useBroadcast';
+import { useDynamoDB } from '@/server/util/useDynamoDB';
 import {
 	AttemptToChooseOutsideNightErrorResponse,
 	AttemptToVoteOutsideDayErrorResponse,
@@ -89,7 +89,7 @@ export default defineEventHandler(
 				game.players.push(player);
 			} else {
 				game.pending ??= [];
-				game.pending.push(player);
+				game.pending!.push(player);
 			}
 
 			const dynamo: DynamoDBWrapper = useDynamoDB(event);
@@ -177,7 +177,8 @@ export default defineEventHandler(
 				return UnauthorisedErrorResponse;
 			}
 			// Must have minimum number of players
-			const min = parseInt(useRuntimeConfig().public.MIN_PLAYERS);
+			const setting: number = parseInt(useRuntimeConfig().public.MIN_PLAYERS);
+			const min: number = setting > 0 ? setting : 6;
 			if (game.players.length < min) {
 				setResponseStatus(event, 400);
 				return NotEnoughPlayersErrorResponse;
@@ -316,7 +317,7 @@ export default defineEventHandler(
 			const player = gameUtil.findPlayer(body.player) as Player;
 			const accused = gameUtil.findPlayer(body.vote) as Player;
 			activity.votes ??= {};
-			if (Object.keys(activity.votes).includes(body.player)) {
+			if (Object.keys(activity.votes!).includes(body.player)) {
 				setResponseStatus(event, 400);
 				return CannotVoteTwiceErrorReponse;
 			}
@@ -326,7 +327,7 @@ export default defineEventHandler(
 				// Do we move onto the next night, or is the game over (either they guessed
 				// right, or the wolf has won) - let's count up all the votes
 				const count: Record<string, number> = {};
-				for (const id of Object.values(activity.votes)) {
+				for (const id of Object.values(activity.votes as Votes)) {
 					if (!(id in count)) {
 						count[id] = 0;
 					}

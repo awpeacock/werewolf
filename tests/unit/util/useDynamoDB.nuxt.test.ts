@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { H3Event, EventHandlerRequest } from 'h3';
 
+import { useDynamoDB } from '@/server/util/useDynamoDB';
+
 import { stubDynamoWrapper } from '@tests/unit/setup/dynamodb';
 
 vi.stubGlobal('defineEventHandler', (func: unknown) => func);

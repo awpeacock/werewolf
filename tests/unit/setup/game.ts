@@ -1,7 +1,7 @@
 import { expect, vi } from 'vitest';
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 
-import { stubGameInactive } from '@tests/unit/setup/stubs';
+import { stubGameInactive } from '@tests/common/stubs';
 
 export const mockGame = {
 	getLatest: vi.fn().mockReturnValue(stubGameInactive),
