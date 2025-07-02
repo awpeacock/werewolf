@@ -6,7 +6,6 @@ import {
 	PutCommand,
 	UpdateCommand,
 } from '@aws-sdk/lib-dynamodb';
-
 import { getDynamoMock } from '@tests/integration/setup/dynamodb';
 
 export const useDynamoDB = (event: H3Event<EventHandlerRequest>) => {
@@ -25,12 +24,14 @@ export const useDynamoDB = (event: H3Event<EventHandlerRequest>) => {
 	}
 };
 
-export const createDynamoDBWrapper = (config: Record<string, string>): DynamoDBWrapper => {
+export const createDynamoDBWrapper = (
+	config: Record<string, string | unknown>
+): DynamoDBWrapper => {
 	const client = new DynamoDBClient({
-		region: config.AWS_REGION,
+		region: config.AWS_REGION as string,
 		credentials: {
-			accessKeyId: config.AWS_ACCESS_KEY_ID,
-			secretAccessKey: config.AWS_SECRET_ACCESS_KEY,
+			accessKeyId: config.AWS_ACCESS_KEY_ID as string,
+			secretAccessKey: config.AWS_SECRET_ACCESS_KEY as string,
 		},
 	});
 	const docClient = DynamoDBDocumentClient.from(client);
@@ -39,7 +40,7 @@ export const createDynamoDBWrapper = (config: Record<string, string>): DynamoDBW
 		// Store a newly created game to the database
 		put: async (game: Game): Promise<void> => {
 			const put = new PutCommand({
-				TableName: config.AWS_DYNAMODB_TABLE,
+				TableName: config.AWS_DYNAMODB_TABLE as string,
 				Item: {
 					Id: game.id,
 					Created: new Date().toISOString(),
@@ -93,7 +94,7 @@ export const createDynamoDBWrapper = (config: Record<string, string>): DynamoDBW
 			values[':next'] = game.version! + 1;
 			values[':current'] = game.version!;
 			const update = new UpdateCommand({
-				TableName: config.AWS_DYNAMODB_TABLE,
+				TableName: config.AWS_DYNAMODB_TABLE as string,
 				Key: {
 					Id: game.id,
 				},
@@ -107,7 +108,7 @@ export const createDynamoDBWrapper = (config: Record<string, string>): DynamoDBW
 		// Retrieve a game from the database
 		get: async (id: string): Promise<Nullable<Game>> => {
 			const get = new GetCommand({
-				TableName: config.AWS_DYNAMODB_TABLE,
+				TableName: config.AWS_DYNAMODB_TABLE as string,
 				Key: {
 					Id: id,
 				},

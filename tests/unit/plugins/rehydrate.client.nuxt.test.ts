@@ -17,6 +17,7 @@ mockNuxtImport('useGame', () => {
 
 describe('Session Rehydration Plugin', async () => {
 	const spyLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+	const spyInfo = vi.spyOn(console, 'info').mockImplementation(() => {});
 	const spyError = vi.spyOn(console, 'error').mockImplementation(() => {});
 
 	beforeEach(() => {
@@ -39,7 +40,7 @@ describe('Session Rehydration Plugin', async () => {
 			expect.objectContaining({ id: stubGameInactive.id }),
 			expect.objectContaining({ id: stubVillager1.id })
 		);
-		expect(spyLog).toHaveBeenCalledWith(expect.stringContaining('Player found on session'));
+		expect(spyInfo).toHaveBeenCalledWith(expect.stringContaining('Player found on session'));
 	});
 
 	it('restores game only from session', async () => {
@@ -53,7 +54,9 @@ describe('Session Rehydration Plugin', async () => {
 			expect.stringContaining('Game state successfully retrieved - session updated')
 		);
 		expect(mockWSConnect).not.toHaveBeenCalled();
-		expect(spyLog).not.toHaveBeenCalledWith(expect.stringContaining('Player found on session'));
+		expect(spyInfo).not.toHaveBeenCalledWith(
+			expect.stringContaining('Player found on session')
+		);
 	});
 
 	it('catches and logs an error retrieving the game/player from session', async () => {
@@ -66,7 +69,7 @@ describe('Session Rehydration Plugin', async () => {
 			await plugin({} as NuxtApp);
 		}).not.toThrowError();
 
-		expect(spyLog).toHaveBeenCalledExactlyOnceWith(
+		expect(spyInfo).toHaveBeenCalledExactlyOnceWith(
 			expect.stringContaining('Existing game found on session')
 		);
 		expect(mockWSConnect).not.toHaveBeenCalled();

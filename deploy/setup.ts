@@ -34,8 +34,8 @@ const secret = process.env.AWS_SECRET_ACCESS_KEY;
 const table = process.env.AWS_DYNAMODB_TABLE;
 info(`Stack Name: ${stack}`);
 info(`Region: ${region}`);
-info(`Access Key ID: ${id}`);
-info(`Secret Access Key: ${secret}`);
+// info(`Access Key ID: ${id}`);
+// info(`Secret Access Key: ${secret}`);
 info(`Table Name: ${table}`);
 
 if (!stack || !region || !id || !secret || !table) {

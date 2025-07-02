@@ -4,13 +4,16 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { Role } from '@/types/enums';
 
 import {
+	stubGameActive,
 	stubGameBlank,
 	stubGameInactive,
 	stubGameNew,
 	stubGamePending,
+	stubHealer,
 	stubMayor,
 	stubVillager1,
 	stubVillager2,
+	stubWolf,
 } from '@tests/common/stubs';
 
 mockNuxtImport('useEnvironment', () => {
@@ -82,6 +85,36 @@ describe('Game Pinia Store', () => {
 	it('should return null trying to return a mayor for an empty game', async () => {
 		store.$reset();
 		expect(store.mayor).toBeNull();
+	});
+
+	it('should return the wolf of the stored game', async () => {
+		store.set(stubGameActive);
+		expect(store.wolf).toEqual(stubWolf);
+	});
+
+	it('should return null trying to return a wolf for a game without one', async () => {
+		store.set(stubGameNew);
+		expect(store.wolf).toBeNull();
+	});
+
+	it('should return null trying to return a wolf for an empty game', async () => {
+		store.$reset();
+		expect(store.wolf).toBeNull();
+	});
+
+	it('should return the healer of the stored game', async () => {
+		store.set(stubGameActive);
+		expect(store.healer).toEqual(stubHealer);
+	});
+
+	it('should return null trying to return a healer for a game without one', async () => {
+		store.set(stubGameNew);
+		expect(store.healer).toBeNull();
+	});
+
+	it('should return null trying to return a healer for an empty game', async () => {
+		store.$reset();
+		expect(store.healer).toBeNull();
 	});
 
 	it('should successfully return a player that exists in players array', () => {

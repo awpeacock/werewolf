@@ -97,7 +97,7 @@ stubVotesWolf1[stubHealer.id] = stubMayor.id;
 
 export const stubVotesWolf2: Votes = {};
 stubVotesWolf2[stubWolf.id] = stubHealer.id;
-stubVotesWolf2[stubHealer.id] = stubVillager8.id;
+stubVotesWolf2[stubHealer.id] = stubMayor.id;
 
 export const stubVotesComplete1: Votes = {};
 stubVotesComplete1[stubMayor.id] = stubVillager8.id;
@@ -108,16 +108,11 @@ stubVotesComplete1[stubVillager7.id] = stubVillager6.id;
 stubVotesComplete1[stubVillager8.id] = stubHealer.id;
 
 export const stubVotesComplete2: Votes = {};
-stubVotesComplete1[stubMayor.id] = stubWolf.id;
-stubVotesComplete1[stubWolf.id] = stubVillager7.id;
-stubVotesComplete1[stubVillager7.id] = stubWolf.id;
-stubVotesComplete1[stubVillager8.id] = stubWolf.id;
+stubVotesComplete2[stubMayor.id] = stubWolf.id;
+stubVotesComplete2[stubWolf.id] = stubVillager7.id;
+stubVotesComplete2[stubVillager7.id] = stubWolf.id;
+stubVotesComplete2[stubVillager8.id] = stubWolf.id;
 
-export const stubActivityBlank: Activity = {
-	wolf: null,
-	healer: null,
-	votes: {},
-};
 export const stubActivityWolfOnly: Activity = {
 	wolf: stubVillager6.id,
 	healer: null,

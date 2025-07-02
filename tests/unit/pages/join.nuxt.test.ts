@@ -54,6 +54,8 @@ describe('Join Game page', () => {
 			},
 			route: route ?? '/join',
 		});
+		await flushPromises();
+		await nextTick();
 		return wrapper;
 	};
 
@@ -178,6 +180,24 @@ describe('Join Game page', () => {
 		useGameStore().$reset();
 		usePlayerStore().$reset();
 		vi.clearAllMocks();
+		// Each page visit will call this API now
+		server.use(
+			http.get('/api/games/:code/', async (request) => {
+				const { code } = request.params;
+				spyApi(request);
+				switch (code) {
+					case stubGamePending.id: {
+						return HttpResponse.json(stubGamePending, { status: 200 });
+					}
+					case stubGameInactive.id: {
+						return HttpResponse.json(stubGameInactive, { status: 200 });
+					}
+					default: {
+						return HttpResponse.json(GameIdNotFoundErrorResponse, { status: 404 });
+					}
+				}
+			})
+		);
 	});
 
 	afterEach(() => {

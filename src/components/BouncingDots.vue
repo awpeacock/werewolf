@@ -1,5 +1,5 @@
 <template>
-	<div class="flex flex-row w-full justify-center mt-8">
+	<div class="flex flex-row w-full justify-center mt-8" data-testid="bounce">
 		<div
 			class="h-6 w-6 mr-2 bg-white rounded-full animate-bounce [animation-delay:-0.3s]"
 		></div>

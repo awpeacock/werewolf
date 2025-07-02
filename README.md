@@ -121,6 +121,12 @@ npm run preview --build=no
 
 ## Testing
 
+Before running any tests, make sure you setup your Playwright environment for your end-to-end tests:
+
+```bash
+npx playwright install
+```
+
 Run the test suite with:
 
 ```bash

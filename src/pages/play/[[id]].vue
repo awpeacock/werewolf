@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { BlankActivity } from '@/types/constants';
 import { Role } from '@/types/enums';
 
 definePageMeta({
@@ -37,11 +38,19 @@ const isDead = computed(() => {
 const isEvicted = computed(() => {
 	return util.isPlayerEvicted(player.id);
 });
+const wasEvicted = computed(() => {
+	return util.wasPlayerEvicted(player.id);
+});
 const hasDecided = computed(() => {
 	const current: Undefinable<Activity> = game.activities?.at(-1);
 	if (!current) {
 		return false;
 	}
+	// The wolf/healer could get here via refresh after the votes are complete, and there will be no
+	// new activity - this would lead to a false positive as it would suggest both have chosen.  This *should*
+	// be unreachable due to the logic in the night() method but, belts and braces, and all that ...
+	// Playwright certainly can't hit it though, hence the ignore
+	/* istanbul ignore next @preserve */
 	if (util.isActivityComplete(current)) {
 		return false;
 	}
@@ -58,26 +67,17 @@ const hasDecided = computed(() => {
 	return false;
 });
 const hasVoted = computed(() => {
+	let voted = false;
 	const current = game.activities?.at(-1);
 	if (current && current.votes) {
-		return Object.keys(current.votes).includes(player.id);
+		voted = Object.keys(current.votes).includes(player.id);
 	}
-	return false;
+	return voted;
 });
-const victim = computed(() => {
-	const current = game.activities?.at(-1);
-	if (current && current.wolf) {
-		return game.findPlayer(current.wolf);
-	}
-	return null;
-});
-const evicted = computed(() => {
-	const current = game.activities?.at(-1);
-	if (current && current.evicted) {
-		return game.findPlayer(current.evicted);
-	}
-	return null;
-});
+// These next two once were computed, but Playwright has shown up a flakiness here around the
+// reactivity so they're now set to Refs to give us more control
+const victim: Ref<Nullable<Player>> = ref(null);
+const evicted: Ref<Nullable<Player>> = ref(null);
 const alive = computed(() => util.getAlivePlayers());
 const dead = computed(() => util.getDeadPlayers());
 const evictees = computed(() => util.getEvictedPlayers());
@@ -114,6 +114,7 @@ const role = computed(() => {
 onMounted(async () => {
 	// Configurable values
 	const config = useRuntimeConfig().public.MIN_PLAYERS;
+	/* istanbul ignore next @preserve */
 	if (config) {
 		min.value = parseInt(config);
 	}
@@ -123,15 +124,14 @@ onMounted(async () => {
 	// the code in the URL must match up to that in the session,
 	// and the player must be in the game
 	await refresh();
-	if (code.value !== game.id) {
+	if (code.value === undefined || code.value === '') {
 		state.value = 'invalid';
-		if (code.value === undefined || code.value === '') {
-			error.value = 'you-must-come-here-with-a-valid-game-code';
-		} else {
-			error.value = 'you-have-the-wrong-game-code';
-		}
+		error.value = 'you-must-come-here-with-a-valid-game-code';
 	} else {
-		if (!player || player.id === '') {
+		if (code.value !== game.id) {
+			state.value = 'invalid';
+			error.value = 'you-have-the-wrong-game-code';
+		} else if (!player || player.id === '') {
 			state.value = 'invalid';
 			error.value = 'you-have-not-yet-joined';
 		}
@@ -151,7 +151,20 @@ onMounted(async () => {
 	}
 	// If not invalidated, check the default state
 	if (state.value !== 'invalid') {
-		state.value = !game.active ? (game.finished ? 'completion' : 'initial') : 'selection';
+		// If the game is active, always show the screen telling them who they are in case they
+		// forgot (or never saw it in the first place) - their first button click will take them
+		// through to the right stage
+		if (game.active) {
+			state.value = 'selection';
+		}
+		// If the game isn't active, is it because we haven't started yet or because we've finished?
+		if (!game.active) {
+			if (game.finished) {
+				state.value = 'completion';
+			} else {
+				state.value = 'initial';
+			}
+		}
 	}
 });
 
@@ -168,6 +181,7 @@ const start = async (event: MouseEvent) => {
 		})
 			.then((response: Game) => {
 				game.set(useGame(response).parse());
+				state.value = 'selection';
 				loading.value = false;
 			})
 			.catch((e) => {
@@ -184,11 +198,7 @@ const start = async (event: MouseEvent) => {
 const play = async (event: MouseEvent) => {
 	event.preventDefault();
 	refresh();
-	if (game.stage) {
-		state.value = game.stage;
-	} else {
-		state.value = 'night';
-	}
+	update();
 };
 // Handle the choices of the wolf and the healer
 const choose = async (event: MouseEvent) => {
@@ -207,6 +217,9 @@ const choose = async (event: MouseEvent) => {
 	})
 		.then((response: Game) => {
 			game.set(useGame(response).parse());
+			if (game.stage === 'day') {
+				update();
+			}
 			loading.value = false;
 		})
 		.catch((e) => {
@@ -234,6 +247,11 @@ const vote = async (event: MouseEvent) => {
 	})
 		.then((response: Game) => {
 			game.set(useGame(response).parse());
+			if (game.stage === 'night') {
+				update();
+			} else if (game.winner && !game.active) {
+				state.value = 'completion';
+			}
 			loading.value = false;
 		})
 		.catch((e) => {
@@ -250,7 +268,13 @@ const night = async (event: MouseEvent) => {
 	event.preventDefault();
 	if (!override.value) {
 		state.value = 'night';
-		game.activities?.push({});
+		const current = game.activities?.at(-1);
+		if (current) {
+			if (util.isActivityComplete(current)) {
+				const blank: Activity = structuredClone(BlankActivity);
+				game.activities!.push(blank);
+			}
+		}
 	} else {
 		state.value = 'day';
 	}
@@ -267,23 +291,69 @@ const refresh = async () => {
 		useLogger().error('Could not retrieve latest game state', e as Error);
 	}
 };
+// Always make sure we have the correct values in place to display
+const update = () => {
+	const current: Undefinable<Activity> = game.activities?.at(-1);
+	if (current) {
+		if (util.isActivityComplete(current)) {
+			// If our most recent activity is complete, then we should be showing
+			// the eviction screen NOT night time - in case the user came here from a refresh
+			// and did not see who was evicted.  If they have seen who was evicted, this is still
+			// fine as, if we were actually at night time and either the wolf or healer had chosen
+			// we would not have a complete activity as our most recent - so nobody is missing
+			// anything or out of sync.
+			if (current.evicted) {
+				evicted.value = game.findPlayer(current.evicted);
+			} else {
+				evicted.value = null;
+			}
+			state.value = 'eviction';
+		} else {
+			// However, if it is not complete, then we need to determine if the wolf and healer
+			// have both chosen so we know whether to show daytime or nighttime (and whether we
+			// have a victim)
+			if (current.wolf) {
+				const healer = game.healer!;
+				if (
+					current.healer ||
+					util.isPlayerDead(healer.id) ||
+					util.isPlayerEvicted(healer.id)
+				) {
+					if (current.wolf !== current.healer) {
+						victim.value = game.findPlayer(current.wolf);
+					} else {
+						victim.value = null;
+					}
+					if (state.value !== 'eviction') {
+						state.value = 'day';
+					}
+				} else {
+					state.value = 'night';
+				}
+			} else {
+				state.value = 'night';
+			}
+		}
+	} else {
+		state.value = 'night';
+	}
+};
 
 watch(
 	() => socket.latest.value,
 	(event) => {
 		if (event) {
-			let update = false;
+			let doSync = false,
+				doUpdate = false;
+			let newState: Nullable<PlayState> = null;
 			if (event.type === 'start-game') {
 				const start = event as StartGameEvent;
 				player.addRole(start.role);
-				state.value = 'selection';
-				update = true;
+				newState = 'selection';
 			}
 			if (event.type === 'morning') {
-				if (state.value !== 'eviction') {
-					state.value = 'day';
-				}
-				update = true;
+				doSync = true;
+				doUpdate = true;
 				// If a villager clicks continue after the wolf and healer have
 				// chosen, they will be pushed through to the night screen unless
 				// we ensure that is overridden
@@ -292,14 +362,21 @@ watch(
 				}
 			}
 			if (event.type === 'eviction') {
-				state.value = 'eviction';
-				update = true;
+				newState = 'eviction';
+				doSync = true;
+				doUpdate = true;
 			} else if (event.type === 'game-over') {
-				state.value = 'completion';
-				update = true;
+				newState = 'completion';
+				doSync = true;
 			}
-			if (update) {
+			if (doSync) {
 				game.set(event.game);
+			}
+			if (doUpdate) {
+				update();
+			}
+			if (newState) {
+				state.value = newState;
 			}
 		}
 	}
@@ -341,7 +418,7 @@ watch(
 		<div v-if="state === 'selection'">
 			<BodyText class="text-center">{{ $t('the-game-is-under-way') }}</BodyText>
 			<Heading class="text-center">{{ $t('you-are') }}</Heading>
-			<h3 class="mb-4 font-oswald text-center text-6xl text-yellow-200">
+			<h3 class="mb-4 font-oswald text-center text-6xl text-yellow-200" data-testid="role">
 				{{ $t(role).toUpperCase() }}
 			</h3>
 			<Button link="" label="play" class="w-full" @click="play" />
@@ -349,26 +426,42 @@ watch(
 		<div v-if="state === 'night'">
 			<BodyText>{{ $t('night-descends') }}</BodyText>
 			<div v-if="isWolf || isHealer">
-				<div v-if="hasDecided">
-					<BodyText>{{
-						$t('you-have-chosen', { wait: isWolf ? 'the healer' : 'the wolf' })
-					}}</BodyText>
+				<div v-if="isDead || isEvicted">
+					<div v-if="isDead">
+						<BodyText>{{ $t('you-cannot-heal-because-you-are-dead') }}</BodyText>
+					</div>
+					<div v-else>
+						<BodyText>{{
+							$t('you-cannot-heal-because-you-have-been-evicted')
+						}}</BodyText>
+					</div>
+					<BodyText>{{ $t('we-wait') }}</BodyText>
 					<BouncingDots />
 				</div>
 				<div v-else>
-					<BodyText>{{ $t(`make-your-decision-${role}`) }}</BodyText>
-					<div class="grid grid-cols-3 gap-4">
-						<Button
-							v-for="(villager, idx) in util
-								.getAlivePlayers()
-								.filter((p) => p.id !== player.id)"
-							:key="idx"
-							link=""
-							:label="villager.nickname"
-							:translate="false"
-							class="w-full"
-							@click="choose"
-						/>
+					<div v-if="hasDecided">
+						<BodyText>{{
+							$t('you-have-chosen', {
+								wait: isWolf ? $t('the healer') : $t('the wolf'),
+							})
+						}}</BodyText>
+						<BouncingDots />
+					</div>
+					<div v-else>
+						<BodyText>{{ $t(`make-your-decision-${role}`) }}</BodyText>
+						<div class="grid grid-cols-3 gap-4">
+							<Button
+								v-for="(villager, idx) in util
+									.getAlivePlayers()
+									.filter((p) => p.id !== player.id)"
+								:key="idx"
+								link=""
+								:label="villager.nickname"
+								:translate="false"
+								class="w-full"
+								@click="choose"
+							/>
+						</div>
 					</div>
 				</div>
 			</div>
@@ -416,7 +509,7 @@ watch(
 			</div>
 		</div>
 		<div v-if="state === 'eviction'">
-			<div v-if="isEvicted">
+			<div v-if="wasEvicted">
 				<BodyText>{{ $t('you-have-been-evicted') }}</BodyText>
 			</div>
 			<div v-else>
@@ -431,8 +524,8 @@ watch(
 				<BodyText v-else>
 					{{ $t('you-have-evicted-nobody') }}
 				</BodyText>
-				<Button link="" label="continue" class="w-full" @click="night" />
 			</div>
+			<Button link="" label="continue" class="w-full" @click="night" />
 		</div>
 		<div v-if="state === 'completion'">
 			<Heading class="text-center">{{ $t('game-over') }}</Heading>

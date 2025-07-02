@@ -12,6 +12,7 @@ import { MockWebSocket } from '@tests/unit/setup/websocket';
 
 describe('useWebSocketClient', async () => {
 	const spyLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+	const spyInfo = vi.spyOn(console, 'info').mockImplementation(() => {});
 	const spyWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 	const socket = useWebSocketClient();
 
@@ -22,6 +23,7 @@ describe('useWebSocketClient', async () => {
 	afterEach(() => {
 		useWebSocketClient().reset();
 		spyLog.mockClear();
+		spyInfo.mockClear();
 		spyWarn.mockClear();
 	});
 
@@ -92,7 +94,7 @@ describe('useWebSocketClient', async () => {
 		} as MessageEvent);
 		await flushPromises();
 
-		expect(spyLog).toBeCalledWith(expect.stringContaining('1 message(s) received'));
+		expect(spyInfo).toBeCalledWith(expect.stringContaining('1 message(s) received'));
 		const expected = structuredClone(event);
 		expected.game.created = JSON.stringify(expected.game.created).replaceAll('"', '');
 		expect(socket.latest.value).toEqual(expected);
@@ -118,7 +120,7 @@ describe('useWebSocketClient', async () => {
 		} as MessageEvent);
 		await flushPromises();
 
-		expect(spyLog).toBeCalledWith(expect.stringContaining('1 message(s) received'));
+		expect(spyInfo).toBeCalledWith(expect.stringContaining('1 message(s) received'));
 		const expected = structuredClone(event);
 		expected.game.created = JSON.stringify(expected.game.created).replaceAll('"', '');
 		expect(socket.latest.value).toEqual(expected);
@@ -156,7 +158,7 @@ describe('useWebSocketClient', async () => {
 		} as MessageEvent);
 		await flushPromises();
 
-		expect(spyLog).toBeCalledWith(expect.stringContaining('2 message(s) received'));
+		expect(spyInfo).toBeCalledWith(expect.stringContaining('2 message(s) received'));
 		expect(socket.requests.value).toHaveLength(2);
 		expect(socket.requests.value[1].player.nickname).toBe(stubVillager2.nickname);
 
@@ -170,7 +172,7 @@ describe('useWebSocketClient', async () => {
 		} as MessageEvent);
 		await flushPromises();
 
-		expect(spyLog).toBeCalledWith(expect.stringContaining('3 message(s) received'));
+		expect(spyInfo).toBeCalledWith(expect.stringContaining('3 message(s) received'));
 		expect(socket.requests.value).toHaveLength(3);
 		expect(socket.requests.value[2].player.nickname).toBe(stubVillager3.nickname);
 
@@ -188,7 +190,7 @@ describe('useWebSocketClient', async () => {
 		socket.disconnect();
 		await flushPromises();
 
-		expect(spyLog).toHaveBeenCalledWith(expect.stringContaining('WebSocket disconnected'));
+		expect(spyInfo).toHaveBeenCalledWith(expect.stringContaining('WebSocket disconnected'));
 		spyLog.mockClear();
 	});
 });

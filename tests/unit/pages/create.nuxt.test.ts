@@ -196,7 +196,7 @@ describe('Create Game page', () => {
 		});
 		expectStage2(wrapper, locale, stubGameNew.id);
 
-		const button = wrapper.find('button[data-test="invite-button"]');
+		const button = wrapper.find('button[data-testid="invite-button"]');
 		await button.trigger('click');
 		await flushPromises();
 

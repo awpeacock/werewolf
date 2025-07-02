@@ -1,4 +1,5 @@
 /* istanbul ignore file @preserve */
+
 export const useEnvironment = () => {
 	return {
 		// Can't mock import.meta.client so we need a helper function to test
@@ -21,6 +22,10 @@ export const useEnvironment = () => {
 			} catch {
 				return false;
 			}
+		},
+		// And the same again for Integration or E2E tests
+		isTest: () => {
+			return process.env.IS_INTEGRATION === 'true' || process.env.IS_E2E === 'true';
 		},
 	};
 };

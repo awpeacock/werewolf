@@ -3,6 +3,7 @@ const app = useNuxtApp();
 const route = useRoute();
 const localePath = useLocalePath();
 const locales: Array<string> = useI18n().localeCodes.value;
+const t = useI18n().t;
 
 const styles = {
 	container: {
@@ -33,6 +34,30 @@ const updateState = (path: string) => {
 	image.value = isHome.value && !isErrorPage.value ? styles.image.home : styles.image.default;
 };
 
+const title = computed(() => {
+	const meta = route.meta?.title as string | undefined;
+
+	/* istanbul ignore else @preserve */
+	if (meta === 'werewolf-game') {
+		return t('werewolf-game');
+	} else if (typeof meta === 'string' && meta.trim() !== '') {
+		return t('werewolf') + ' : ' + t(meta);
+	} else {
+		return t('werewolf');
+	}
+});
+
+const heading = computed(() => {
+	const meta = route.meta?.title as string | undefined;
+
+	/* istanbul ignore else @preserve */
+	if (typeof meta === 'string' && meta) {
+		return t(meta);
+	} else {
+		return '';
+	}
+});
+
 // We should only be checking against route on the client
 onMounted(() => {
 	updateState(route.path);
@@ -50,11 +75,7 @@ watch(
 <template>
 	<header class="flex flex-col w-full text-center my-4" :class="container">
 		<Head v-if="!isErrorPage">
-			<Title>{{
-				route.meta.title == 'werewolf-game'
-					? $t('werewolf-game')
-					: $t('werewolf') + ' : ' + $t((route.meta?.title as string) || '')
-			}}</Title>
+			<Title>{{ title }}</Title>
 		</Head>
 		<h1 v-if="isHome || isErrorPage" class="text-7xl text-yellow-200 font-oswald">
 			{{ $t('werewolf') }}
@@ -73,13 +94,7 @@ watch(
 			<div v-if="!isHome" class="flex flex-col w-full mx-4 self-center">
 				<h1 class="mb-2 text-5xl text-yellow-200 font-oswald">{{ $t('werewolf') }}</h1>
 				<h2 class="text-yellow-100 font-oswald text-4xl">
-					{{
-						$t(
-							typeof route.meta.title === 'string' && route.meta.title
-								? route.meta.title
-								: ''
-						)
-					}}
+					{{ heading }}
 				</h2>
 			</div>
 		</div>

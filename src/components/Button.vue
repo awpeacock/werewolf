@@ -30,17 +30,6 @@ const clazz = computed(() => {
 
 const localePath = useLocalePath();
 const target = { path: localePath(props.link), query: {} };
-if (props.link.indexOf('?') !== -1) {
-	target.path = localePath(props.link.substring(0, props.link.indexOf('?')));
-	const query = props.link.substring(props.link.indexOf('?') + 1);
-	const params: { [key: string]: string } = {};
-	const pairs = query.split('&');
-	for (const pair of pairs) {
-		const [key, val] = pair.split('=');
-		params[key] = val;
-	}
-	target.query = params;
-}
 </script>
 
 <template>

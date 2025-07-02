@@ -93,7 +93,7 @@ const create = async (): Promise<void> => {
 				link="/create"
 				label="create"
 				class="w-full"
-				data-test="create-button"
+				data-testid="create-button"
 				@click="create"
 			/>
 		</div>
@@ -102,7 +102,7 @@ const create = async (): Promise<void> => {
 			<Button
 				link="/create/invite"
 				label="invite-players"
-				data-test="invite-button"
+				data-testid="invite-button"
 				class="w-full"
 			/>
 			<Button :link="game.url" label="play-game" class="w-full" />

@@ -1,3 +1,4 @@
+import { BlankActivity } from '@/types/constants';
 import { Role } from '@/types/enums';
 
 export const useGame = (game: Game) => {
@@ -114,6 +115,28 @@ export const useGame = (game: Game) => {
 		return false;
 	};
 
+	const wasPlayerEvicted = (identifier: string): boolean => {
+		if (!game.activities || game.activities.length === 0) {
+			return false;
+		}
+		const player = findPlayer(identifier);
+		let activity = game.activities.at(-1);
+		// Race conditions might mean this is being tested AFTER
+		// the new activity has been injected which would give a
+		// false negative
+		if (!isActivityComplete(activity!)) {
+			if (game.activities.length > 1) {
+				activity = game.activities.at(-2);
+			} else {
+				return false;
+			}
+		}
+		if (player!.id === activity!.evicted) {
+			return true;
+		}
+		return false;
+	};
+
 	const getEvictedPlayers = (): Array<Player> => {
 		if (!game.activities) {
 			return [];
@@ -170,7 +193,7 @@ export const useGame = (game: Game) => {
 
 	const getCurrentActivity = (): Activity => {
 		if (!game.activities || game.activities.length == 0) {
-			const activity: Activity = { wolf: null, healer: null, votes: {} };
+			const activity: Activity = structuredClone(BlankActivity);
 			game.activities = [activity];
 			return activity;
 		}
@@ -178,7 +201,7 @@ export const useGame = (game: Game) => {
 		if (!isActivityComplete(latest)) {
 			return latest;
 		}
-		const activity: Activity = { wolf: null, healer: null, votes: {} };
+		const activity: Activity = structuredClone(BlankActivity);
 		game.activities.push(activity);
 		return activity;
 	};
@@ -187,8 +210,14 @@ export const useGame = (game: Game) => {
 		if (activity!.wolf === null || activity!.wolf === undefined) {
 			return false;
 		}
-		if (activity!.healer === null || activity!.healer === undefined) {
-			return false;
+		// Important check - if the healer gets killed or evicted, then marking
+		// an activity as incomplete if they haven't made a choice will always
+		// return false
+		const healer = getHealer();
+		if (healer && !isPlayerEvicted(healer.id) && !isPlayerDead(healer.id)) {
+			if (activity!.healer === null || activity!.healer === undefined) {
+				return false;
+			}
 		}
 		if (activity!.votes === undefined) {
 			return false;
@@ -211,6 +240,7 @@ export const useGame = (game: Game) => {
 		isPlayerDead,
 		getDeadPlayers,
 		isPlayerEvicted,
+		wasPlayerEvicted,
 		getEvictedPlayers,
 		getAlivePlayers,
 		admitPlayer,

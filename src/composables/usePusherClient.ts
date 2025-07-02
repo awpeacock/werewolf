@@ -45,6 +45,7 @@ export function usePusherClient() {
 			reset();
 		});
 
+		/* istanbul ignore next @preserve */
 		pusher.connection.bind('error', (e: Error) => {
 			useLogger().error('Pusher connection error', e);
 		});
@@ -90,6 +91,7 @@ export function usePusherClient() {
 
 	const disconnect = () => {
 		if (pusher) {
+			/* istanbul ignore next @preserve */
 			pusher.unsubscribe(channels.public?.name ?? '');
 			pusher.disconnect();
 			reset();

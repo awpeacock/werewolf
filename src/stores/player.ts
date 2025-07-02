@@ -33,9 +33,6 @@ export const usePlayerStore = defineStore('player', {
 		addRole(role: Role) {
 			this.roles.push(role);
 		},
-		setRoles(roles: Role[]) {
-			this.roles = roles;
-		},
 	},
 	persist: config,
 });

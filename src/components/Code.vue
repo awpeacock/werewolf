@@ -29,11 +29,14 @@ const next = (event: KeyboardEvent, idx: number): void => {
 					input.focus();
 				}
 			}
-			emit('update', formfield.value);
+			emit('update', formfield.value?.toUpperCase());
 		}
 	});
 };
-const validate = (): boolean => {
+const validate = (idx?: number): boolean => {
+	if (Number.isInteger(idx) && idx! < 3) {
+		return true;
+	}
 	const valid = formfield.validate(useValidation().validateCode);
 	// Clean up any blank chars so the user can enter into those
 	// inputs on return (if not the space will take up the one allowed char)
@@ -68,16 +71,24 @@ defineExpose({ validate });
 				minlength="1"
 				maxlength="1"
 				:data-key="idx"
+				data-testid="code-char"
 				@keydown="filter($event)"
+				@input="
+					($event.target as HTMLInputElement).value = (
+						$event.target as HTMLInputElement
+					).value?.toUpperCase()
+				"
 				@keyup="next($event, idx)"
 				@focus="formfield.reset"
+				@blur="validate(idx)"
 			/>
-			<span v-if="!editable" class="block p-4">{{ char }}</span>
+			<span v-if="!editable" class="block p-4" data-testid="code-char">{{ char }}</span>
 		</li>
 	</ul>
 	<div
 		v-if="formfield.error !== ''"
 		class="-mt-4 mb-4 ml-4 mr-4 p-2 rounded-b-lg bg-red-600 text-white font-oswald"
+		data-testid="code-error"
 	>
 		{{ $t(formfield.error) }}
 	</div>

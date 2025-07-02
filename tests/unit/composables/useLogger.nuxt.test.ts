@@ -3,12 +3,14 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 
 let isProduction = false;
 let isClient = false;
+let isTest = false;
 
 mockNuxtImport('useEnvironment', () => {
 	return () => {
 		return {
 			isClient: vi.fn(() => isClient),
 			isProduction: vi.fn(() => isProduction),
+			isTest: vi.fn(() => isTest),
 		};
 	};
 });
@@ -29,7 +31,7 @@ describe('useLogger', () => {
 	});
 
 	it('should successfully log an information message', () => {
-		const spyLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+		const spyLog = vi.spyOn(console, 'info').mockImplementation(() => {});
 		useLogger().info('Info message');
 		expect(spyLog).toBeCalledWith('\x1b[1m\x1b[34m\u2139\x1b[0m Info message');
 	});
@@ -44,11 +46,14 @@ describe('useLogger', () => {
 		isProduction = true;
 		isClient = true;
 		const spyLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+		const spyInfo = vi.spyOn(console, 'info').mockImplementation(() => {});
 		const spyError = vi.spyOn(console, 'error').mockImplementation(() => {});
 		const spyWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
 		useLogger().success('Success message');
 		expect(spyLog).not.toBeCalled();
+		useLogger().success('Info message');
+		expect(spyInfo).not.toBeCalled();
 		useLogger().error('Error message');
 		expect(spyError).not.toBeCalled();
 		useLogger().info('Info message');
@@ -72,5 +77,34 @@ describe('useLogger', () => {
 		expect(spyLog).toBeCalled();
 		useLogger().warn('Warning message');
 		expect(spyWarn).toBeCalled();
+	});
+
+	it('should not log anything in E2E testing mode', () => {
+		isProduction = false;
+		isClient = true;
+		isTest = true;
+		const spyLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+		const spyError = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const spyWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+		useLogger().success('Success message');
+		expect(spyLog).not.toBeCalled();
+		useLogger().error('Error message');
+		expect(spyError).not.toBeCalled();
+		useLogger().info('Info message');
+		expect(spyLog).not.toBeCalled();
+		useLogger().warn('Warning message');
+		expect(spyWarn).not.toBeCalled();
+
+		isClient = false;
+
+		useLogger().success('Success message');
+		expect(spyLog).not.toBeCalled();
+		useLogger().error('Error message');
+		expect(spyError).not.toBeCalled();
+		useLogger().info('Info message');
+		expect(spyLog).not.toBeCalled();
+		useLogger().warn('Warning message');
+		expect(spyWarn).not.toBeCalled();
 	});
 });

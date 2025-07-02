@@ -252,25 +252,33 @@ export default defineEventHandler(
 			// we need to broadcast the move on to daytime.  The healer may be dead,
 			// so will never complete their activities - to prevent the game getting
 			// stuck inject an entry that will never match
-			if (gameUtil.isPlayerDead(gameUtil.getHealer()!.id)) {
+			if (
+				gameUtil.isPlayerDead(gameUtil.getHealer()!.id) ||
+				gameUtil.isPlayerEvicted(gameUtil.getHealer()!.id)
+			) {
 				activity.healer = '-';
 			}
+			const broadcast = useBroadcast();
+			let payload: Undefinable<MorningEvent>;
 			const waitingForWolf = activity.wolf === null || activity.wolf === undefined;
 			const waitingForHealer =
 				(activity.healer === null || activity.healer === undefined) &&
-				!gameUtil.isPlayerDead(gameUtil.getHealer()!.id);
+				!gameUtil.isPlayerDead(gameUtil.getHealer()!.id) &&
+				!gameUtil.isPlayerEvicted(gameUtil.getHealer()!.id);
 			if (!waitingForWolf && !waitingForHealer) {
 				game.stage = 'day';
-				const broadcast = useBroadcast();
-				const payload: MorningEvent = {
+				payload = {
 					type: 'morning',
 					game: game,
 				};
-				await broadcast.send({ game: game.id }, payload);
 			}
 			const dynamo: DynamoDBWrapper = useDynamoDB(event);
 			await dynamo.update(game);
 			setResponseStatus(event, 200);
+			// Only send out notifications AFTER updating the DB so there's no risk of being out of sync
+			if (payload) {
+				await broadcast.send({ game: game.id }, payload);
+			}
 			return game;
 		};
 
@@ -290,7 +298,8 @@ export default defineEventHandler(
 			const waitingForWolf = activity.wolf === null || activity.wolf === undefined;
 			const waitingForHealer =
 				(activity.healer === null || activity.healer === undefined) &&
-				!gameUtil.isPlayerDead(gameUtil.getHealer()!.id);
+				!gameUtil.isPlayerDead(gameUtil.getHealer()!.id) &&
+				!gameUtil.isPlayerEvicted(gameUtil.getHealer()!.id);
 			const valid = !waitingForWolf && !waitingForHealer;
 			if (!valid) {
 				setResponseStatus(event, 400);
@@ -323,6 +332,8 @@ export default defineEventHandler(
 			}
 			activity.votes[player.id] = accused.id;
 
+			const broadcast = useBroadcast();
+			let payload: Undefinable<GameEvent>;
 			if (Object.keys(activity.votes).length === gameUtil.getAlivePlayers().length) {
 				// Do we move onto the next night, or is the game over (either they guessed
 				// right, or the wolf has won) - let's count up all the votes
@@ -348,40 +359,35 @@ export default defineEventHandler(
 					game.finished = new Date();
 					game.active = false;
 					game.winner = 'village';
-
-					const broadcast = useBroadcast();
-					const payload: GameOverEvent = {
+					payload = {
 						type: 'game-over',
 						game: game,
 					};
-					await broadcast.send({ game: game.id }, payload);
 				} else if (gameUtil.getAlivePlayers().length <= 3) {
 					// But, if we only have 3 left then the wolf has won
 					game.finished = new Date();
 					game.active = false;
 					game.winner = 'wolf';
-
-					const broadcast = useBroadcast();
-					const payload: GameOverEvent = {
+					payload = {
 						type: 'game-over',
 						game: game,
 					};
-					await broadcast.send({ game: game.id }, payload);
 				} else {
 					// Otherwise, we go round again
 					game.stage = 'night';
-
-					const broadcast = useBroadcast();
-					const payload: EvictionEvent = {
+					payload = {
 						type: 'eviction',
 						game: game,
 						player: activity.evicted ? gameUtil.findPlayer(activity.evicted) : null,
 					};
-					await broadcast.send({ game: game.id }, payload);
 				}
 			}
 			const dynamo: DynamoDBWrapper = useDynamoDB(event);
 			await dynamo.update(game);
+			// Only send out notifications AFTER updating the DB so there's no risk of being out of sync
+			if (payload) {
+				await broadcast.send({ game: game.id }, payload);
+			}
 			setResponseStatus(event, 200);
 			return game;
 		};

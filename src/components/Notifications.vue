@@ -38,7 +38,7 @@ watch(
 const admit = async (villager: Player, admit: boolean) => {
 	const api = `/api/games/${game.id}/admit`;
 	const body: AdmissionBody = { auth: player.id, villager: villager.id, admit: admit };
-	$fetch<Game>(api, {
+	return $fetch<Game>(api, {
 		method: 'PUT',
 		body: body,
 	})
@@ -70,14 +70,19 @@ const admit = async (villager: Player, admit: boolean) => {
 		>
 			<IconAlarm class="w-[32px] h-[32px] *:fill-teal-800" />
 			<span class="flex flex-row flex-1 items-center justify-left">
-				<strong>{{ request.nickname }}</strong>
+				<strong data-testid="join-name">{{ request.nickname }}</strong>
 				&nbsp;
 				{{ $t('waiting-to-be-admitted') }}
 				<YesNo :yes="() => admit(request, true)" :no="() => admit(request, false)" />
 			</span>
 		</li>
 		<li v-if="error">
-			<Error message="unexpected-error" class="mx-8 mt-4" @click="error = false" />
+			<Error
+				message="unexpected-error"
+				class="mx-8 mt-4"
+				data-testid="admit-error"
+				@click="error = false"
+			/>
 		</li>
 	</ul>
 </template>

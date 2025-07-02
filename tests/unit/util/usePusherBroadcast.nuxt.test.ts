@@ -20,7 +20,7 @@ vi.mock('pusher', () => {
 });
 
 describe('usePusherBroadcast', async () => {
-	const spyLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+	const spyInfo = vi.spyOn(console, 'info').mockImplementation(() => {});
 
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -40,7 +40,7 @@ describe('usePusherBroadcast', async () => {
 			'game-event',
 			event
 		);
-		expect(spyLog).toBeCalledWith(
+		expect(spyInfo).toBeCalledWith(
 			expect.stringContaining(
 				`Event "join-request" broadcast for game ${stubGamePending.id} to player ${stubMayor.id}`
 			)
@@ -60,7 +60,7 @@ describe('usePusherBroadcast', async () => {
 			'game-event',
 			event
 		);
-		expect(spyLog).toBeCalledWith(
+		expect(spyInfo).toBeCalledWith(
 			expect.stringContaining(`Event "morning" broadcast for game ${stubGameActive.id}`)
 		);
 	});

@@ -1,34 +1,42 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 import tailwindcss from '@tailwindcss/vite';
+import istanbul from 'vite-plugin-istanbul';
 import path from 'path';
+
+const isCoverageEnabled = process.env.VITE_COVERAGE === 'true';
 
 export default defineNuxtConfig({
 	compatibilityDate: '2024-11-01',
 	devtools: {
-		enabled: true,
+		enabled: !isCoverageEnabled,
 	},
-	modules: [
-		'@nuxt/eslint',
-		'@nuxt/test-utils/module',
-		'@nuxtjs/i18n',
-		'@pinia/nuxt',
-		'pinia-plugin-persistedstate/nuxt',
-	],
+	modules: ['@nuxt/eslint', '@nuxtjs/i18n', '@pinia/nuxt', 'pinia-plugin-persistedstate/nuxt'],
 	typescript: {
-		typeCheck: true,
+		typeCheck: !isCoverageEnabled,
 	},
 	vite: {
-		plugins: [tailwindcss()],
+		plugins: [
+			tailwindcss(),
+			isCoverageEnabled &&
+				istanbul({
+					include: 'src/*',
+					exclude: ['node_modules', 'deploy', 'tests/'],
+					extension: ['.js', '.ts', '.vue'],
+					cypress: false,
+					forceBuildInstrument: true,
+					requireEnv: true,
+				}),
+		].filter(Boolean),
 		server: {
 			fs: {
 				strict: false,
 			},
 		},
 		css: {
-			devSourcemap: false,
+			devSourcemap: isCoverageEnabled,
 		},
 		build: {
-			sourcemap: false,
+			sourcemap: isCoverageEnabled,
 		},
 	},
 	nitro: {

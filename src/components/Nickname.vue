@@ -32,12 +32,15 @@ defineExpose({ focus, validate });
 			maxlength="16"
 			v-bind="$attrs"
 			:value="modelValue"
+			data-testid="nickname-input"
 			@input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
 			@focus="formfield.reset"
+			@blur="validate"
 		/>
 		<div
 			v-if="formfield.error"
 			class="ml-4 mr-4 p-2 rounded-b-lg bg-red-600 text-white font-oswald"
+			data-testid="nickname-error"
 		>
 			{{ $t(formfield.error) }}
 		</div>

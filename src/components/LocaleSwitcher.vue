@@ -9,6 +9,7 @@ const switchLocalePath = useSwitchLocalePath();
 		<NuxtLink
 			v-for="lang in locales"
 			:key="lang.code"
+			:data-testid="lang.code"
 			:to="switchLocalePath(lang.code)"
 			:disabled="lang.code === locale"
 		>

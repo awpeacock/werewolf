@@ -7,7 +7,7 @@ const util = useGame(game);
 
 const loaded = ref(false);
 const margin = computed(() => {
-	return route.meta.footer ? 'max-sm:mb-[250px]' : '';
+	return route.meta.footer === null ? '' : 'max-sm:mb-[250px]';
 });
 const direction = computed(() => {
 	return route.path === '/' && !app.payload.error ? 'md:flex-row' : '';
@@ -42,11 +42,14 @@ onMounted(() => {
 				<span
 					v-if="player.id !== '' && game && util.isPlayerAdmitted(player.id)"
 					class="mt-3"
+					data-testid="player-details"
 				>
 					<span class="font-oswald text-yellow-200 mr-2"
 						>{{ player.nickname }} ({{ $t(player.role) }})</span
 					>
-					<span class="font-oswald text-white mr-2">{{ game.id }}</span>
+					<span class="font-oswald text-white mr-2" data-testid="game-code">
+						{{ game.id }}
+					</span>
 				</span>
 				<Notifications />
 				<LocaleSwitcher />

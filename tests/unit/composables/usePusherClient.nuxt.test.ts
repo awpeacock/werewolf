@@ -36,6 +36,7 @@ vi.mock('pusher-js', () => {
 
 describe('usePusherClient', async () => {
 	const spyLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+	const spyInfo = vi.spyOn(console, 'info').mockImplementation(() => {});
 	const spyWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 	const spyError = vi.spyOn(console, 'error').mockImplementation(() => {});
 	const socket = usePusherClient();
@@ -73,6 +74,7 @@ describe('usePusherClient', async () => {
 	afterEach(() => {
 		usePusherClient().reset();
 		spyLog.mockClear();
+		spyInfo.mockClear();
 		spyError.mockClear();
 	});
 
@@ -107,7 +109,7 @@ describe('usePusherClient', async () => {
 
 		await flushPromises();
 		expect(socket.latest.value).toEqual(event);
-		expect(spyLog).toHaveBeenCalledWith(
+		expect(spyInfo).toHaveBeenCalledWith(
 			expect.stringContaining('Game event received: start-game')
 		);
 	});
@@ -120,7 +122,7 @@ describe('usePusherClient', async () => {
 
 		expect(socket.latest.value).toEqual(event);
 		expect(socket.requests.value[0].player.nickname).toBe(stubVillager2.nickname);
-		expect(spyLog).toHaveBeenCalledWith(
+		expect(spyInfo).toHaveBeenCalledWith(
 			expect.stringContaining(`Join Request from "${stubVillager2.nickname}" received`)
 		);
 	});
@@ -136,13 +138,13 @@ describe('usePusherClient', async () => {
 
 		await triggerJoinRequest(stubVillager3);
 
-		expect(spyLog).toBeCalledWith(expect.stringContaining('2 message(s) received'));
+		expect(spyInfo).toBeCalledWith(expect.stringContaining('2 message(s) received'));
 		expect(socket.requests.value).toHaveLength(2);
 		expect(socket.requests.value[1].player.nickname).toBe(stubVillager3.nickname);
 
 		await triggerJoinRequest(stubVillager4);
 
-		expect(spyLog).toBeCalledWith(expect.stringContaining('3 message(s) received'));
+		expect(spyInfo).toBeCalledWith(expect.stringContaining('3 message(s) received'));
 		expect(socket.requests.value).toHaveLength(3);
 		expect(socket.requests.value[2].player.nickname).toBe(stubVillager4.nickname);
 
@@ -169,7 +171,7 @@ describe('usePusherClient', async () => {
 		if (callback) callback();
 
 		await flushPromises();
-		expect(spyLog).toHaveBeenCalledWith(expect.stringContaining('Pusher disconnected'));
+		expect(spyInfo).toHaveBeenCalledWith(expect.stringContaining('Pusher disconnected'));
 	});
 
 	it('should handle any error events', async () => {
@@ -190,13 +192,13 @@ describe('usePusherClient', async () => {
 		const game = structuredClone(stubGameNew);
 		await triggerConnect(game, stubMayor);
 
-		spyLog.mockClear();
+		spyInfo.mockClear();
 
 		socket.connect(game, stubMayor);
 		expect(spyWarn).toHaveBeenCalledWith(
 			expect.stringContaining('Pusher client already connected')
 		);
-		expect(spyLog).not.toBeCalledWith(expect.stringContaining('Pusher connected'));
+		expect(spyInfo).not.toBeCalledWith(expect.stringContaining('Pusher connected'));
 	});
 
 	it('should not error if called to disconnect from a non-existent Pusher', async () => {

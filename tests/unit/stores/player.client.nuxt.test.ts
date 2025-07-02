@@ -47,15 +47,6 @@ describe('Player Pinia Store', () => {
 		expect(store.roles).toContain(Role.VILLAGER);
 	});
 
-	it('should successfully set all roles for a player', async () => {
-		store.set(stubVillager1);
-
-		const roles = [Role.MAYOR, Role.WOLF];
-		store.setRoles(roles);
-
-		expect(store.roles).toEqual(roles);
-	});
-
 	it('should return the designated role of a player', async () => {
 		const players = [stubVillager6, stubWolf, stubHealer];
 		const roles = ['villager', 'wolf', 'healer'];

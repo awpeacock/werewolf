@@ -65,10 +65,15 @@ onMounted(() => {
 				<div class="flex flex-col sm:flex-row">
 					<div class="flex flex-row justify-center items-center">
 						<span v-if="showShare" class="w-1/5 mb-4 mr-4 cursor-pointer">
-							<IconShare class="size-full *:fill-yellow-200" @click="share" />
+							<IconShare
+								:alt="$t('share-icon')"
+								class="size-full *:fill-yellow-200"
+								data-testid="share-icon"
+								@click="share"
+							/>
 						</span>
-						<a :href="mailto" class="w-1/3 mb-4 mr-4">
-							<IconMail class="size-full *:fill-yellow-200" />
+						<a :href="mailto" class="w-1/3 mb-4 mr-4" data-testid="email-icon">
+							<IconMail :alt="$t('mail-icon')" class="size-full *:fill-yellow-200" />
 						</a>
 					</div>
 					<div
@@ -80,12 +85,16 @@ onMounted(() => {
 						>
 							<IconCopy
 								v-if="!copied"
+								:alt="$t('copy-icon')"
 								class="w-[16px] mt-[2px] mb-[1px]"
+								data-testid="copy-icon"
 								@click="copy"
 							/>
 							<span v-else>&#10004;</span>
 						</p>
-						<p class="my-auto pr-[16px] lg:text-lg">{{ url }}</p>
+						<p class="my-auto pr-[16px] lg:text-lg" data-testid="invite-url">
+							{{ url }}
+						</p>
 					</div>
 				</div>
 
@@ -93,7 +102,7 @@ onMounted(() => {
 			</div>
 		</div>
 		<div v-else>
-			<p v-if="error" class="mb-4 font-oswald text-base text-white">{{ $t(error) }}</p>
+			<Error :message="error" />
 		</div>
 		<Button link="/create" label="go-back" class="w-full" />
 	</div>

@@ -1,3 +1,6 @@
+// Please note re Istanbul ignore comments - these are edge case scenarios that never occur in the app,
+// thus will never be covered by Playwright tests, but they are covered by unit tests
+
 type FormComponentState = {
 	value: Undefinable<string>;
 	classes: string;
@@ -27,16 +30,20 @@ export const useFormfield = (
 	const inputs: Ref<Array<HTMLInputElement>> = computed(() => {
 		if (Array.isArray(element.value)) {
 			return element.value.flatMap((el) => {
+				/* istanbul ignore if @preserve */
 				if (el instanceof HTMLInputElement) {
 					return [el];
 				} else {
 					return Array.from(el.querySelectorAll<HTMLInputElement>('input'));
 				}
 			});
-		} else if (element.value instanceof HTMLInputElement) {
-			return [element.value];
 		} else {
-			return Array.from(element.value!.querySelectorAll<HTMLInputElement>('input'));
+			/* istanbul ignore else @preserve */
+			if (element.value instanceof HTMLInputElement) {
+				return [element.value];
+			} else {
+				return Array.from(element.value!.querySelectorAll<HTMLInputElement>('input'));
+			}
 		}
 	});
 
@@ -83,6 +90,7 @@ export const useFormfield = (
 	// When the "parent" component has mounted, we need to keep track
 	// of any updates to it
 	onMounted(() => {
+		/* istanbul ignore else @preserve */
 		if (element.value) {
 			internalRef.value = element.value;
 			inputs.value.forEach((input) => {

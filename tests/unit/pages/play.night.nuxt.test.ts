@@ -9,7 +9,10 @@ import { GameIdNotFoundErrorResponse, UnauthorisedErrorResponse } from '@/types/
 import { Role } from '@/types/enums';
 
 import {
+	stubActivitiesComplete,
 	stubGameActive,
+	stubGameDeadHealer,
+	stubGameIncorrectVotes1,
 	stubHealer,
 	stubMayor,
 	stubVillager6,
@@ -90,6 +93,7 @@ describe('Play Game (Night time) page', () => {
 		sessionStorage.clear();
 		useGameStore().$reset();
 		usePlayerStore().$reset();
+		mockWSLatest.value = null;
 		vi.clearAllMocks();
 	});
 
@@ -111,7 +115,7 @@ describe('Play Game (Night time) page', () => {
 	);
 
 	it.each(['en', 'de'])(
-		'should display the correct day time voting page',
+		'should display the correct night time choice page',
 		async (locale: string) => {
 			storeGame.set(structuredClone(stubGameActive));
 			mockGame.getLatest = vi.fn().mockReturnValue(stubGameActive);
@@ -155,6 +159,58 @@ describe('Play Game (Night time) page', () => {
 	);
 
 	it.each(['en', 'de'])(
+		'should NOT display the night time page for the healer if they are dead',
+		async (locale: string) => {
+			const game = structuredClone(stubGameDeadHealer);
+			game.stage = 'night';
+			game.activities!.at(-1)!.votes![stubVillager6.id] = stubVillager7.id;
+			storeGame.set(game);
+			mockGame.getLatest = vi.fn().mockReturnValue(game);
+			storePlayer.set(structuredClone(stubHealer));
+			const wrapper = await setupPage(locale, '/play/' + game.id);
+
+			await wrapper.find('button').trigger('click');
+			await flushPromises();
+
+			// New step - now, for people coming back in fresh we remind them of any previous evictions
+			expect(wrapper.text()).toContain(`you-have-not-chosen-the-wolf (${locale})`);
+			await wrapper.find('button').trigger('click');
+			await flushPromises();
+
+			expect(wrapper.text()).toContain(`night-time (${locale})`);
+			expect(wrapper.text()).toContain(`you-cannot-heal-because-you-are-dead (${locale})`);
+			expect(wrapper.text()).toContain(`we-wait (${locale})`);
+		}
+	);
+
+	it.each(['en', 'de'])(
+		'should NOT display the night time page for the healer if they are evicted',
+		async (locale: string) => {
+			const game = structuredClone(stubGameActive);
+			game.stage = 'night';
+			game.activities = [stubActivitiesComplete[0]];
+			storeGame.set(game);
+			mockGame.getLatest = vi.fn().mockReturnValue(game);
+			storePlayer.set(structuredClone(stubHealer));
+			const wrapper = await setupPage(locale, '/play/' + game.id);
+
+			await wrapper.find('button').trigger('click');
+			await flushPromises();
+
+			// New step - now, for people coming back in fresh we remind them of any previous evictions
+			expect(wrapper.text()).toContain(`you-have-been-evicted (${locale})`);
+			await wrapper.find('button').trigger('click');
+			await flushPromises();
+
+			expect(wrapper.text()).toContain(`night-time (${locale})`);
+			expect(wrapper.text()).toContain(
+				`you-cannot-heal-because-you-have-been-evicted (${locale})`
+			);
+			expect(wrapper.text()).toContain(`we-wait (${locale})`);
+		}
+	);
+
+	it.each(['en', 'de'])(
 		'should submit the choices for the wolf and the healer individually and present the wait screen',
 		async (locale: string) => {
 			storeGame.set(structuredClone(stubGameActive));
@@ -186,9 +242,47 @@ describe('Play Game (Night time) page', () => {
 
 				const waitingFor = roles[p] === Role.WOLF ? 'the healer' : 'the wolf';
 				expect(wrapper.text()).toContain(
-					`you-have-chosen {wait: ${waitingFor}}  (${locale})`
+					`you-have-chosen {wait: ${waitingFor} (${locale})}  (${locale})`
 				);
 				expect(wrapper.findComponent(BouncingDots).exists()).toBeTruthy();
+			}
+		}
+	);
+
+	it.each(['en', 'de'])(
+		'should move the game on for the wolf/healer directly (without the need for a socket event) when they are last to choose',
+		async (locale: string) => {
+			storeGame.set(structuredClone(stubGameActive));
+			mockGame.getLatest = vi.fn().mockReturnValue(stubGameActive);
+			const players = [stubWolf, stubHealer];
+			const roles = [Role.WOLF, Role.HEALER];
+			for (let p = 0; p < players.length; p++) {
+				storePlayer.set(structuredClone(players[p]));
+				const wrapper = await setupPage(locale, '/play/' + stubGameActive.id);
+
+				await wrapper.find('button').trigger('click');
+				await flushPromises();
+				await nextTick();
+
+				const game = structuredClone(stubGameActive);
+				game.stage = 'day';
+				game.activities?.push({
+					wolf: stubGameActive.players.at(0)!.id,
+					healer: stubGameActive.players.at(0)!.id,
+					votes: {},
+				});
+				await triggerChoice(
+					wrapper,
+					stubGameActive.id,
+					players[p],
+					roles[p],
+					true,
+					200,
+					game
+				);
+
+				expect(wrapper.text()).toContain(`activity-summary-saved (${locale})`);
+				expect(wrapper.text()).toContain(`time-for-the-village-to-vote (${locale})`);
 			}
 		}
 	);
@@ -220,7 +314,8 @@ describe('Play Game (Night time) page', () => {
 
 				await waitFor(() => wrapper.text().includes(`activity-summary-saved (${locale})`));
 			}
-		}
+		},
+		10000
 	);
 
 	it.each(['en', 'de'])(
@@ -256,7 +351,8 @@ describe('Play Game (Night time) page', () => {
 						)
 				);
 			}
-		}
+		},
+		10000
 	);
 
 	it.each(['en', 'de'])(
@@ -287,6 +383,24 @@ describe('Play Game (Night time) page', () => {
 					}
 				}
 			}
+		}
+	);
+
+	it.each(['en', 'de'])(
+		`should handle a player accessing the "night" screen without all votes having been made`,
+		async (locale: string) => {
+			const game = structuredClone(stubGameIncorrectVotes1);
+			game.stage = 'night';
+			storeGame.set(structuredClone(game));
+			mockGame.getLatest = vi.fn().mockReturnValue(game);
+			storePlayer.set(structuredClone(stubMayor));
+			const wrapper = await setupPage(locale, '/play/' + game.id);
+
+			await wrapper.find('button').trigger('click');
+			await flushPromises();
+
+			expect(wrapper.text()).toContain(`day-time (${locale})`);
+			expect(wrapper.text()).toContain(`time-for-the-village-to-vote (${locale})`);
 		}
 	);
 

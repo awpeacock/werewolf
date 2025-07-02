@@ -40,6 +40,7 @@ export const useGameStore = defineStore('game', {
 	getters: {
 		invite(): string {
 			const path = `/join/${this.id}`;
+			/* istanbul ignore else @preserve */
 			if (this.mayor) {
 				return `${path}?invite=${this.mayor.id}`;
 			} else {
@@ -58,6 +59,9 @@ export const useGameStore = defineStore('game', {
 		},
 		wolf(): Nullable<Player> {
 			return useGame(this).getWolf();
+		},
+		healer(): Nullable<Player> {
+			return useGame(this).getHealer();
 		},
 	},
 	persist: config,

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { ref, type Ref } from 'vue';
+
 import Code from '@/components/Code.vue';
 import Nickname from '@/components/Nickname.vue';
 
@@ -12,6 +14,7 @@ definePageMeta({
 
 type JoinState = 'form' | 'wait' | 'admitted' | 'denied';
 const game = useGameStore();
+const player = usePlayerStore();
 const loading: Ref<boolean> = ref(false);
 
 // Navigation - check which stage we're at, whether we've had a code or invite
@@ -43,9 +46,13 @@ const errGlobal: Ref<Nullable<string>> = ref(null);
 const socket = useBroadcastClient();
 
 // Let's detect if we've got a player already in the process of joining
-onMounted(() => {
-	const player = usePlayerStore();
+onMounted(async () => {
+	reset();
+	if (game && game.id && game.id !== '') {
+		game.set(await useGame(game).getLatest());
+	}
 	if (game.id !== '' && player.id !== '') {
+		valNickname.value = player.nickname;
 		if (game.hasPlayer(player.id)) {
 			if (game.isPlayerAdmitted(player.id)) {
 				state.value = 'admitted';
@@ -66,6 +73,7 @@ const entered = (val: string) => {
 		fldNickname.value!.focus();
 	}
 };
+
 const join = async (_event: MouseEvent) => {
 	// Clear down any existing error messages so the screen
 	// is only updated with "live" errors from this attempt
@@ -78,13 +86,13 @@ const join = async (_event: MouseEvent) => {
 	const valid = validCode && validNickname;
 	if (valid) {
 		loading.value = true;
-		const api =
-			`/api/games/${code.value.toUpperCase()}/join` + (invite ? `?invite=${invite}` : '');
-		const body: JoinRequestBody = { villager: valNickname.value };
-		$fetch<Game>(api, {
-			method: 'PUT',
-			body: body,
-		})
+		$fetch<Game>(
+			`/api/games/${code.value.toUpperCase()}/join` + (invite ? `?invite=${invite}` : ''),
+			{
+				method: 'PUT',
+				body: { villager: valNickname.value },
+			}
+		)
 			.then((response: Game) => {
 				game.set(useGame(response).parse());
 				const player: Nullable<Player> = game.findPlayer(valNickname.value);
@@ -125,9 +133,16 @@ const join = async (_event: MouseEvent) => {
 };
 const reset = () => {
 	state.value = 'form';
-	code.value = '    ';
-	valCode.value = ['', '', '', ''];
+	if (editable) {
+		code.value = '    ';
+		valCode.value = ['', '', '', ''];
+	} else {
+		fldCode.value?.validate();
+	}
 	valNickname.value = '';
+	errGlobal.value = null;
+	errCode.value = null;
+	errNickname.value = null;
 };
 
 watch(
@@ -163,9 +178,16 @@ watch(
 				@update="entered"
 			/>
 			<Nickname ref="fldNickname" v-model="valNickname" :error="errNickname" />
-			<Button :link="game.url" label="join-now" class="w-full" @click.prevent="join" />
+			<Button
+				:link="game.url"
+				label="join-now"
+				class="w-full"
+				data-testid="join-button"
+				@click.prevent="join"
+			/>
 		</div>
 		<div v-if="state === 'wait'">
+			<Subheading>{{ valNickname }}</Subheading>
 			<BodyText>{{ $t('you-are-waiting-to-be-admitted') }}</BodyText>
 			<BodyText>{{
 				$t('the-mayor-has-been-informed', { mayor: game.mayor?.nickname })
@@ -175,6 +197,7 @@ watch(
 		</div>
 		<div v-if="state === 'admitted'">
 			<Heading>{{ $t('you-are-in') }}</Heading>
+			<Subheading>{{ valNickname }}</Subheading>
 			<BodyText>
 				{{ $t('mayor-has-let-you-in', { mayor: game.mayor?.nickname }) }}
 			</BodyText>
@@ -182,10 +205,11 @@ watch(
 		</div>
 		<div v-if="state === 'denied'">
 			<Heading>{{ $t('denied') }}</Heading>
+			<Subheading>{{ valNickname }}</Subheading>
 			<BodyText>
 				{{ $t('mayor-has-rejected-your-request', { mayor: game.mayor?.nickname }) }}
 			</BodyText>
-			<Button link="/join" label="try-again" class="w-full" @click="reset" />
+			<Button link="/join" label="try-again" class="w-full" @click.prevent="reset" />
 		</div>
 	</div>
 </template>

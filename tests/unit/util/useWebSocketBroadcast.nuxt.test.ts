@@ -13,7 +13,7 @@ import {
 vi.unmock('@/server/util/useWebSocketBroadcast');
 
 describe('useWebSocketBroadcast', async () => {
-	const spyLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+	const spyInfo = vi.spyOn(console, 'info').mockImplementation(() => {});
 	const spyError = vi.spyOn(console, 'error').mockImplementation(() => {});
 	const spyWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
@@ -43,14 +43,14 @@ describe('useWebSocketBroadcast', async () => {
 		// This tests where the util has to setup the game key
 		broadcast.open(clients[0], stubGamePending.id, stubVillager1.id);
 
-		expect(spyLog).toHaveBeenCalledWith(
+		expect(spyInfo).toHaveBeenCalledWith(
 			expect.stringContaining(
 				`WebSocket opened for player ID ${stubVillager1.id} (Game Code: ${stubGamePending.id})`
 			)
 		);
 		// This tests for existing keys
 		broadcast.open(clients[1], stubGamePending.id, stubMayor.id);
-		expect(spyLog).toHaveBeenCalledWith(
+		expect(spyInfo).toHaveBeenCalledWith(
 			expect.stringContaining(
 				`WebSocket opened for player ID ${stubMayor.id} (Game Code: ${stubGamePending.id})`
 			)

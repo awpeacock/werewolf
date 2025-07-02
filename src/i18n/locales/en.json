@@ -104,6 +104,8 @@
 	"we-wait": "We wait nervously to hear what carnage and destruction the werewolf caused.",
 	"make-your-decision-the-wolf": "You need to choose which villager to attack:",
 	"make-your-decision-the-healer": "You need to choose which villager to save:",
+	"you-cannot-heal-because-you-are-dead": "Sadly, you are now helpess and cannot heal anyone as you are dead.",
+	"you-cannot-heal-because-you-have-been-evicted": "Sadly, you are now helpess and cannot heal anyone as you have been evicted.",
 	"you-have-chosen": "You have chosen.  We are waiting for {wait} to make their choice.",
 	"activity-summary-saved": "The night is over, and it's good news!  The werewolf struck, but the healer was able to save the intended victim.  Everyone in the village has been able to survive another night.",
 	"activity-summary-not-saved": "The night is over, and it has been a sad night for Lycanville - the werewolf struck again, and the healer was unable to save {victim}.",

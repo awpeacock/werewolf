@@ -76,7 +76,7 @@ describe('Server Game route', async () => {
 
 	// Until we do more useful things with these, all we can do is test for logs
 	it('should log on message, error or close', async () => {
-		const spyLog = vi.spyOn(console, 'log').mockImplementation(() => null);
+		const spyInfo = vi.spyOn(console, 'info').mockImplementation(() => null);
 		const spyError = vi.spyOn(console, 'error').mockImplementation(() => null);
 		const stub: WebSocketPeer = {
 			id: '1bb99196-fca2-4431-bd9a-0e1d021aeb35',
@@ -86,7 +86,7 @@ describe('Server Game route', async () => {
 
 		gameHandler.message!(stub, 'A message');
 
-		expect(spyLog).toHaveBeenLastCalledWith(
+		expect(spyInfo).toHaveBeenLastCalledWith(
 			expect.stringContaining(
 				'Message received from 1bb99196-fca2-4431-bd9a-0e1d021aeb35 - "A message"'
 			)
@@ -102,7 +102,7 @@ describe('Server Game route', async () => {
 
 		gameHandler.close!(stub, 'An event');
 
-		expect(spyLog).toHaveBeenLastCalledWith(
+		expect(spyInfo).toHaveBeenLastCalledWith(
 			expect.stringContaining(
 				'WebSocket closed for 1bb99196-fca2-4431-bd9a-0e1d021aeb35 - Reason: An event'
 			)
@@ -110,7 +110,7 @@ describe('Server Game route', async () => {
 
 		gameHandler.close!(stub, 'A string event');
 
-		expect(spyLog).toHaveBeenLastCalledWith(
+		expect(spyInfo).toHaveBeenLastCalledWith(
 			expect.stringContaining(
 				'WebSocket closed for 1bb99196-fca2-4431-bd9a-0e1d021aeb35 - Reason: A string event'
 			)
@@ -118,7 +118,7 @@ describe('Server Game route', async () => {
 
 		gameHandler.close!(stub, { code: 1001, reason: '' });
 
-		expect(spyLog).toHaveBeenLastCalledWith(
+		expect(spyInfo).toHaveBeenLastCalledWith(
 			expect.stringContaining(
 				'WebSocket closed for 1bb99196-fca2-4431-bd9a-0e1d021aeb35 - Reason: {"code":1001,"reason":""}'
 			)

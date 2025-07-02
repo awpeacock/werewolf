@@ -101,6 +101,8 @@
 	"we-wait": "Wir warten nervös darauf, welches Blutbad und welche Zerstörung der Werwolf angerichtet hat.",
 	"make-your-decision-the-wolf": "Du musst wählen, welchen Dorfbewohner du angreifen willst:",
 	"make-your-decision-the-healer": "Du musst wählen, welchen Dorfbewohner du retten willst:",
+	"you-cannot-heal-because-you-are-dead": "Leider bist du nun hilflos und kannst niemanden heilen, da du tot bist.",
+	"you-cannot-heal-because-you-have-been-evicted": "Leider bist du nun hilflos und kannst niemanden heilen, da du vertrieben wurdest.",
 	"you-have-chosen": "Du hast gewählt. Wir warten auf {wait}, um ihre Wahl zu treffen.",
 	"activity-summary-saved": "Die Nacht ist vorbei, und es gibt gute Neuigkeiten! Der Werwolf hat zugeschlagen, aber der Heiler konnte das beabsichtigte Opfer retten. Alle im Dorf haben eine weitere Nacht überlebt.",
 	"activity-summary-not-saved": "Die Nacht ist vorbei, und es war eine traurige Nacht für Lycanville – der Werwolf hat erneut zugeschlagen, und der Heiler konnte nicht retten {victim}.",

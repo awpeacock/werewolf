@@ -1,3 +1,8 @@
+export const BlankActivity: Activity = {
+	wolf: null,
+	healer: null,
+	votes: {},
+};
 export const UnexpectedErrorResponse: APIErrorResponse = {
 	errors: [{ message: 'An unexpected error has occurred' }],
 };
