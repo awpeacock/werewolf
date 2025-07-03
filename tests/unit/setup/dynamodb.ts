@@ -2,10 +2,8 @@ import { vi } from 'vitest';
 
 import type { NitroApp } from 'nitropack';
 import type { H3Event, EventHandlerRequest } from 'h3';
-import {
-	ConditionalCheckFailedException,
-	type DynamoDBServiceException,
-} from '@aws-sdk/client-dynamodb';
+import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb';
+import type { DynamoDBServiceException } from '@aws-sdk/client-dynamodb';
 
 import {
 	stubGameConcurrentFailure,

@@ -1,5 +1,7 @@
-import Pusher, { type Channel } from 'pusher-js';
-import { ref, type Ref } from 'vue';
+import Pusher from 'pusher-js';
+import type { Channel } from 'pusher-js';
+import { ref } from 'vue';
+import type { Ref } from 'vue';
 import { useLogger } from '@/composables/useLogger';
 
 const events: Ref<Array<GameEvent>> = ref([]);

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mountSuspended } from '@nuxt/test-utils/runtime';
-import { flushPromises, RouterLinkStub, type VueWrapper } from '@vue/test-utils';
+import { flushPromises, RouterLinkStub } from '@vue/test-utils';
+import type { VueWrapper } from '@vue/test-utils';
 
 import page from '@/pages/index.vue';
 import { useGameStore } from '@/stores/game';

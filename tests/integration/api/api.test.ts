@@ -2,9 +2,9 @@ import * as test from '@nuxt/test-utils/e2e';
 import path from 'path';
 
 await test.setup({
-	rootDir: path.resolve(__dirname, '../../../..'),
+	rootDir: path.resolve(__dirname, '../../..'),
 	server: true,
-	dev: true,
+	dev: false,
 });
 
 await import('./get');

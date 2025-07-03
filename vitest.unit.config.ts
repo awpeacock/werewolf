@@ -19,6 +19,7 @@ export default defineVitestConfig({
 			provider: 'istanbul',
 			include: ['**/*'],
 			exclude: ['**/types/**'],
+			reporter: ['html', 'text', 'lcov'],
 			reportsDirectory: path.resolve(__dirname, 'tests/coverage/unit'),
 			all: true,
 			thresholds: {

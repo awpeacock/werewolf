@@ -149,6 +149,55 @@ Most scripts support the following optional flags:
 - `--setup=no` : Skip automatic setup when starting or building the app.
 - `--build=no` : Skip building the app before previewing (used with npm run preview).
 
+## Deployment
+
+### Vercel Setup
+
+If you haven't already, setup an account at [Vercel](https://vercel.com/).
+
+#### 1. Connect the Repository in Vercel:
+
+- Go to https://vercel.com/dashboard
+- Click _Add New Project_
+- Select your GitHub repo, and follow the setup wizard
+
+#### 2. Generate a Vercel Token:
+
+- In your Vercel account, go to _Settings › Tokens_
+- Generate a token (e.g., `werewolf-deploy-token`)
+
+#### 3. Add the Token to GitHub Secrets:
+
+- In GitHub go to _Settings › Secrets and variables › Actions › Secrets_
+- Add a new repository secret:
+    ```
+    Name: VERCEL_TOKEN
+    Value: <your generated token>
+    ```
+
+### GitHub Actions
+
+#### 1. Configure the repo
+
+- Add all the required Environment Secrets and Variables, as laid out in [Environment Configuration](#environment-configuration)
+- The configured workflow YAML expects to see the data in the following locations - make sure to add to the appropriate environments (`test` and `production`); common variables can be stored as repository variables/secrets:
+
+    | Secrets               | Variables          |
+    | --------------------- | ------------------ |
+    | AWS_ACCESS_KEY_ID     | AWS_STACK          |
+    | AWS_SECRET_ACCESS_KEY | AWS_REGION         |
+    |                       | AWS_DYNAMODB_TABLE |
+    |                       | BROADCAST_PROVIDER |
+    | PUSHER_APP_KEY        | PUSHER_APP_ID      |
+    | PUSHER_APP_SECRET     | PUSHER_CLUSTER     |
+    | VERCEL_TOKEN          |                    |
+
+> ⚠️ If using Vercel set `BROADCAST_PROVIDER` to `pusher`.
+
+#### 2. Run the workflow
+
+- Once you have done all of this, simply push your changes to your GitHub repository, select your repo, go to _Actions_ and click _Run workflow_ - if your code passes linters and tests it will automatically deploy to Vercel.
+
 ## License
 
 This project is licensed under the MIT License **with the Commons Clause** — meaning it may not be used for commercial purposes. See the [LICENSE](./LICENSE) file for full details.

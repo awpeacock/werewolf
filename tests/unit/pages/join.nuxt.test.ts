@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mountSuspended } from '@nuxt/test-utils/runtime';
-import { flushPromises, RouterLinkStub, type VueWrapper } from '@vue/test-utils';
+import { flushPromises, RouterLinkStub } from '@vue/test-utils';
+import type { VueWrapper } from '@vue/test-utils';
 import { http, HttpResponse } from 'msw';
 
 import page from '@/pages/join/[[id]].vue';

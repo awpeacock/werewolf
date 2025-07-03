@@ -1,4 +1,5 @@
-import { expect as base, type Page } from '@playwright/test';
+import { expect as base } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
 import { Role } from '@/types/enums';
 

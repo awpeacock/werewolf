@@ -5,9 +5,11 @@ import { UnexpectedErrorResponse } from '@/types/constants';
 import { stubGameNew } from '@tests/common/stubs';
 import { mockApi } from '@tests/e2e/setup/api';
 import { expect } from '@tests/e2e/setup/expect';
-import { simulate, type GameDetails, type Simulation } from '@tests/e2e/setup/simulate';
+import { simulate } from '@tests/e2e/setup/simulate';
+import type { GameDetails, Simulation } from '@tests/e2e/setup/simulate';
 import { test } from '@tests/e2e/setup/test';
-import { wsListener, type WebSocketListener } from '@tests/e2e/setup/websocket';
+import { wsListener } from '@tests/e2e/setup/websocket';
+import type { WebSocketListener } from '@tests/e2e/setup/websocket';
 
 test.describe('Admit/Deny Players', () => {
 	let context: BrowserContext;

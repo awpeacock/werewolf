@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, type Ref } from 'vue';
+import { ref } from 'vue';
+import type { Ref } from 'vue';
 
 import Code from '@/components/Code.vue';
 import Nickname from '@/components/Nickname.vue';

@@ -1,0 +1,116 @@
+name: Werewolf CI/CD
+
+on: workflow_dispatch
+
+jobs:
+    Test:
+        runs-on: ubuntu-latest
+        environment: test
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Detect changes
+              id: changes
+              run: |
+                  BEFORE_SHA=$(git rev-parse HEAD^) || BEFORE_SHA=$(git rev-list --max-parents=0 HEAD)
+                  echo "files=$(git diff --name-only $BEFORE_SHA HEAD)" >> $GITHUB_OUTPUT
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+
+            - name: Install dependencies
+              run: |
+                  rm -rf node_modules package-lock.json
+                  npm install
+
+            - name: Lint code
+              run: npm run lint
+
+            - name: Setup Playwright
+              run: npx playwright install --with-deps
+
+            - name: Run tests (unit, integration and e2e with coverage thresholds)
+              run: |
+                  echo "AWS_STACK=${{ vars.AWS_STACK }}" >> .env.test
+                  echo "AWS_REGION=${{ vars.AWS_REGION }}" >> .env.test
+                  echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> .env.test
+                  echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> .env.test
+                  echo "AWS_DYNAMODB_TABLE=${{ vars.AWS_DYNAMODB_TABLE }}" >> .env.test
+                  echo "BROADCAST_PROVIDER=${{ vars.BROADCAST_PROVIDER }}" >> .env.test
+                  echo "PUSHER_APP_ID=${{ vars.PUSHER_APP_ID }}" >> .env.test
+                  echo "PUSHER_APP_KEY=${{ secrets.PUSHER_APP_KEY }}" >> .env.test
+                  echo "PUSHER_APP_SECRET=${{ secrets.PUSHER_APP_SECRET }}" >> .env.test
+                  echo "PUSHER_CLUSTER=${{ vars.PUSHER_CLUSTER }}" >> .env.test
+                  trap 'echo "Teardown on exit"; npm run destroy --env=test' EXIT
+                  npm run test
+              env:
+                  AWS_STACK: ${{ vars.AWS_STACK }}
+                  AWS_REGION: ${{ vars.AWS_REGION }}
+                  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                  AWS_DYNAMODB_TABLE: ${{ vars.AWS_DYNAMODB_TABLE }}
+                  BROADCAST_PROVIDER: 'pusher'
+                  PUSHER_APP_ID: ${{ vars.PUSHER_APP_ID }}
+                  PUSHER_APP_KEY: ${{ secrets.PUSHER_APP_KEY }}
+                  PUSHER_APP_SECRET: ${{ secrets.PUSHER_APP_SECRET }}
+                  PUSHER_CLUSTER: ${{ vars.PUSHER_CLUSTER }}
+
+            - name: Merge coverage reports
+              run: |
+                  mkdir -p tests/coverage/merged
+                  if [ -f tests/coverage/unit/lcov.info ] && [ -f tests/coverage/e2e/lcov.info ]; then
+                    npx lcov-result-merger tests/coverage/unit/lcov.info tests/coverage/e2e/lcov.info > tests/coverage/merged/lcov.info
+                  elif [ -f tests/coverage/unit/lcov.info ]; then
+                    cp tests/coverage/unit/lcov.info tests/coverage/merged/lcov.info
+                  elif [ -f tests/coverage/e2e/lcov.info ]; then
+                    cp tests/coverage/e2e/lcov.info tests/coverage/merged/lcov.info
+                  else
+                    echo "No coverage reports found"
+                    exit 1
+                  fi
+
+    Deploy:
+        runs-on: ubuntu-latest
+        needs: Test
+        environment: production
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+
+            - name: Install dependencies
+              run: |
+                  rm -rf node_modules package-lock.json
+                  npm install
+
+            - name: Install Vercel CLI
+              run: npm install -g vercel
+
+            - name: Link Vercel project
+              run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+            - name: Build the app
+              run: |
+                  echo "AWS_STACK=${{ vars.AWS_STACK }}" >> .env.production
+                  echo "AWS_REGION=${{ vars.AWS_REGION }}" >> .env.production
+                  echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> .env.production
+                  echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> .env.production
+                  echo "AWS_DYNAMODB_TABLE=${{ vars.AWS_DYNAMODB_TABLE }}" >> .env.production
+                  echo "BROADCAST_PROVIDER=${{ vars.BROADCAST_PROVIDER }}" >> .env.production
+                  echo "PUSHER_APP_ID=${{ vars.PUSHER_APP_ID }}" >> .env.production
+                  echo "PUSHER_APP_KEY=${{ secrets.PUSHER_APP_KEY }}" >> .env.production
+                  echo "PUSHER_APP_SECRET=${{ secrets.PUSHER_APP_SECRET }}" >> .env.production
+                  echo "PUSHER_CLUSTER=${{ vars.PUSHER_CLUSTER }}" >> .env.production
+                  npm run build
+
+            - name: Deploy to Vercel
+              run: npx vercel --prod --token=${{ secrets.VERCEL_TOKEN }}
