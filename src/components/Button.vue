@@ -15,9 +15,7 @@ const props = withDefaults(
 defineOptions({
 	inheritAttrs: false,
 });
-const emit = defineEmits<{
-	(_e: 'click', _event: MouseEvent): void;
-}>();
+const emit = defineEmits<(_e: 'click', _event: MouseEvent) => void>();
 
 const colours = computed(() => {
 	return props.disabled
@@ -34,9 +32,9 @@ const target = { path: localePath(props.link), query: {} };
 
 <template>
 	<NuxtLink v-slot="{ navigate }" :to="target" custom>
-		<button
+		<a
 			role="link"
-			class="border-2 rounded-2xl mb-4 p-4 font-oswald text-xl cursor-pointer"
+			class="inline-block border-2 rounded-2xl mb-4 p-4 font-oswald text-xl cursor-pointer"
 			:class="clazz"
 			v-bind="$attrs"
 			@click="
@@ -49,6 +47,6 @@ const target = { path: localePath(props.link), query: {} };
 			"
 		>
 			{{ translate ? $t(label) : label }}
-		</button>
+		</a>
 	</NuxtLink>
 </template>

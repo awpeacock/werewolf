@@ -58,7 +58,7 @@ const create = async (): Promise<void> => {
 		loading.value = true;
 		$fetch<Game>('/api/games', {
 			method: 'POST',
-			body: { mayor: nickname.value },
+			body: { mayor: nickname.value.trim() },
 		})
 			.then((response: Game) => {
 				status.value.code = response.id;

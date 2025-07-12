@@ -23,8 +23,8 @@ export function usePusherClient() {
 			return;
 		}
 
-		pusher = new Pusher(config.public.PUSHER_APP_KEY as string, {
-			cluster: config.public.PUSHER_CLUSTER as string,
+		pusher = new Pusher(config.public.PUSHER_APP_KEY, {
+			cluster: config.public.PUSHER_CLUSTER,
 			authEndpoint: '/api/pusher/auth',
 		});
 
@@ -66,27 +66,21 @@ export function usePusherClient() {
 	};
 
 	const handle = (event: GameEvent) => {
-		switch (event.type) {
-			case 'join-request': {
-				const request: JoinRequestEvent = event;
-				requests.value.push(request);
-				useLogger().info(`Join Request from "${request.player.nickname}" received`);
-				break;
-			}
+		if (event.type === 'join-request') {
+			const request: JoinRequestEvent = event;
+			requests.value.push(request);
+			useLogger().info(`Join Request from "${request.player.nickname}" received`);
 		}
 	};
 
 	const remove = (type: string, data: Player) => {
-		switch (type) {
-			case 'join-request': {
-				for (let i = 0; i < requests.value.length; i++) {
-					if (requests.value[i].player.id === data.id) {
-						requests.value.splice(i, 1);
-						useLogger().info(`Join Request from "${data.nickname}" removed from queue`);
-						break;
-					}
+		if (type === 'join-request') {
+			for (let i = 0; i < requests.value.length; i++) {
+				if (requests.value[i].player.id === data.id) {
+					requests.value.splice(i, 1);
+					useLogger().info(`Join Request from "${data.nickname}" removed from queue`);
+					break;
 				}
-				break;
 			}
 		}
 	};

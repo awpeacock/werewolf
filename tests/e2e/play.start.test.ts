@@ -1,3 +1,5 @@
+import type { Page } from '@playwright/test';
+
 import { Role } from '@/types/enums';
 import { GameIdNotFoundErrorResponse, UnexpectedErrorResponse } from '@/types/constants';
 
@@ -13,9 +15,30 @@ import {
 import { mockApi } from '@tests/e2e/setup/api';
 import { expect } from '@tests/e2e/setup/expect';
 import { simulate } from '@tests/e2e/setup/simulate';
+import type { Simulation } from '@tests/e2e/setup/simulate';
 import { test } from '@tests/e2e/setup/test';
 
 test.describe('Play games (Start)', () => {
+	const fail = async (
+		simulation: Simulation,
+		page: Page,
+		code: number,
+		response: APIErrorResponse,
+		message: string,
+		start?: boolean
+	) => {
+		const id = start ? stubGameReady.id : stubGameActive.id;
+		const api = `/api/games/${id}/` + (start ? 'start' : '');
+		await mockApi(page, api, code, JSON.stringify(response), true);
+		if (start) {
+			await simulation.start({ result: { success: false } });
+			await expect(page).toHaveError(message);
+		} else {
+			await simulation.go(`/play/${stubGameActive.id}`);
+			await expect(page).not.toHaveError(message);
+		}
+	};
+
 	test.each(['en', 'de'])('Handle the mayor starting the game', async ({ locale, page }) => {
 		const simulation = await simulate(page, locale, '/');
 		const game = structuredClone(stubGameReady);
@@ -171,15 +194,7 @@ test.describe('Play games (Start)', () => {
 			const simulation = await simulate(page, locale, '/');
 			const game = stubGameActive;
 			await simulation.inject(game, stubVillager6);
-			await mockApi(
-				page,
-				`/api/games/${stubGameActive.id}/`,
-				404,
-				JSON.stringify(GameIdNotFoundErrorResponse),
-				true
-			);
-			await simulation.go(`/play/${stubGameActive.id}`);
-			await expect(page).not.toHaveError('game-not-found');
+			await fail(simulation, page, 404, GameIdNotFoundErrorResponse, 'game-not-found');
 		}
 	);
 
@@ -189,16 +204,7 @@ test.describe('Play games (Start)', () => {
 			const simulation = await simulate(page, locale, '/');
 			const game = stubGameActive;
 			await simulation.inject(game, stubVillager6);
-			await mockApi(
-				page,
-				`/api/games/${stubGameActive.id}/`,
-				500,
-				JSON.stringify(UnexpectedErrorResponse),
-				true
-			);
-			await simulation.go(`/play/${stubGameActive.id}`);
-			// Error should be swallowed
-			await expect(page).not.toHaveError('unexpected-error');
+			await fail(simulation, page, 500, UnexpectedErrorResponse, 'unexpected-error');
 		}
 	);
 
@@ -212,15 +218,7 @@ test.describe('Play games (Start)', () => {
 			await simulation.go(`/play/${game.id}`);
 			await expect(page).toBeReady();
 
-			await mockApi(
-				page,
-				`/api/games/${game.id}/start`,
-				404,
-				JSON.stringify(GameIdNotFoundErrorResponse),
-				true
-			);
-			await simulation.start({ result: { success: false } });
-			await expect(page).toHaveError('game-not-found');
+			await fail(simulation, page, 404, GameIdNotFoundErrorResponse, 'game-not-found', true);
 		}
 	);
 
@@ -234,15 +232,7 @@ test.describe('Play games (Start)', () => {
 			await simulation.go(`/play/${game.id}`);
 			await expect(page).toBeReady();
 
-			await mockApi(
-				page,
-				`/api/games/${game.id}/start`,
-				500,
-				JSON.stringify(UnexpectedErrorResponse),
-				true
-			);
-			await simulation.start({ result: { success: false } });
-			await expect(page).toHaveError('unexpected-error');
+			await fail(simulation, page, 500, UnexpectedErrorResponse, 'unexpected-error', true);
 		}
 	);
 });

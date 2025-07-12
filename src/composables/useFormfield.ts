@@ -28,6 +28,7 @@ export const useFormfield = (
 	// Collect all the actual <input> elements related with the "parent"
 	// component, so we can watch them and retrieve values from them
 	const inputs: Ref<Array<HTMLInputElement>> = computed(() => {
+		/* istanbul ignore else @preserve */
 		if (Array.isArray(element.value)) {
 			return element.value.flatMap((el) => {
 				/* istanbul ignore if @preserve */
@@ -37,13 +38,10 @@ export const useFormfield = (
 					return Array.from(el.querySelectorAll<HTMLInputElement>('input'));
 				}
 			});
+		} else if (element.value instanceof HTMLInputElement) {
+			return [element.value];
 		} else {
-			/* istanbul ignore else @preserve */
-			if (element.value instanceof HTMLInputElement) {
-				return [element.value];
-			} else {
-				return Array.from(element.value!.querySelectorAll<HTMLInputElement>('input'));
-			}
+			return Array.from(element.value!.querySelectorAll<HTMLInputElement>('input'));
 		}
 	});
 

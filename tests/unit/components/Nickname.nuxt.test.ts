@@ -29,6 +29,14 @@ describe('Nickname', async () => {
 		});
 	};
 
+	const triggerInput = async (value: string) => {
+		const input = wrapper.find('input');
+		await input.setValue(value);
+		wrapper.vm.validate();
+		await nextTick();
+		return input;
+	};
+
 	const expectDefaultLayout = (input: DOMWrapper<HTMLInputElement>) => {
 		expect(input).not.toBeNull();
 		expect(input.classes('border-yellow-200')).toBeTruthy();
@@ -74,10 +82,7 @@ describe('Nickname', async () => {
 	it('should validate successfully when a valid name is entered', async () => {
 		mountComponent();
 
-		const input = wrapper.find('input');
-		await input.setValue('TestPlayer');
-		wrapper.vm.validate();
-		await nextTick();
+		const input = await triggerInput('TestPlayer');
 
 		expectSuccessLayout(input);
 		expect(wrapper.props('modelValue')).toEqual('TestPlayer');
@@ -90,10 +95,7 @@ describe('Nickname', async () => {
 			setLocale(locale);
 			mountComponent();
 
-			const input = wrapper.find('input');
-			await input.setValue('Test');
-			wrapper.vm.validate();
-			await nextTick();
+			const input = await triggerInput('Test');
 
 			expectInvalidLayout(input, 'Test', `nickname-min (${locale})`);
 			wrapper.unmount();
@@ -106,10 +108,7 @@ describe('Nickname', async () => {
 			setLocale(locale);
 			mountComponent();
 
-			const input = wrapper.find('input');
-			await input.setValue('Overly Long Test Nickname');
-			wrapper.vm.validate();
-			await nextTick();
+			const input = await triggerInput('Overly Long Test Nickname');
 
 			expectInvalidLayout(input, 'Overly Long Test Nickname', `nickname-max (${locale})`);
 			wrapper.unmount();
@@ -148,10 +147,7 @@ describe('Nickname', async () => {
 			setLocale(locale);
 			mountComponent();
 
-			const input = wrapper.find('input');
-			await input.setValue('ServerSide');
-			wrapper.vm.validate();
-			await nextTick();
+			const input = await triggerInput('ServerSide');
 
 			wrapper.setProps({ error: 'nickname-invalid' });
 			await nextTick();
@@ -165,10 +161,8 @@ describe('Nickname', async () => {
 		setLocale(locale);
 		mountComponent();
 
-		const input = wrapper.find('input');
-		await input.setValue('TestPlayer');
-		wrapper.vm.validate();
-		await nextTick();
+		const input = await triggerInput('TestPlayer');
+
 		expectSuccessLayout(input);
 
 		await input.trigger('focus');

@@ -183,6 +183,18 @@ describe('useWebSocketClient', async () => {
 		expect(socket.requests.value[1].player.nickname).toBe(stubVillager3.nickname);
 	});
 
+	it('should ignore request remove messages other than join requests from the queue', async () => {
+		vi.stubGlobal('WebSocket', MockWebSocket);
+
+		const game = structuredClone(stubGameNew);
+		socket.connect(game, stubMayor);
+		await flushPromises();
+
+		expect(() => {
+			socket.remove('invite-accept', stubVillager2);
+		}).not.toThrow();
+	});
+
 	it('should successfully disconnect and close the socket', async () => {
 		const game = structuredClone(stubGameNew);
 		socket.connect(game, stubMayor);

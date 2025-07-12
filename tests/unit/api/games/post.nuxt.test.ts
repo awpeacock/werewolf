@@ -8,6 +8,7 @@ import {
 	stubErrorNickname,
 	stubGameIdDuplicateError,
 	stubGameIdPutError,
+	stubInvalidNicknames,
 } from '@tests/common/stubs';
 import { mockResponseStatus } from '@tests/unit/setup/api';
 import { setupDynamoWrapperForEvent } from '@tests/unit/setup/dynamodb';
@@ -20,6 +21,15 @@ describe('Games API (POST)', async () => {
 	// we mock UUID so that the mock is fired rather than the real method
 	const event = await setupDynamoWrapperForEvent();
 	expect(spyLog).toBeCalled();
+
+	const expectNewGame = async () => {
+		const handler = await import('@/server/api/games/index.post');
+		const response = await handler.default(event);
+
+		expect(response).not.toBeNull();
+		expect(response).toEqualGame(stubGameNew);
+		expect(mockResponseStatus).toBeCalledWith(event, 200);
+	};
 
 	beforeAll(() => {
 		setupRuntimeConfigForApis();
@@ -35,31 +45,44 @@ describe('Games API (POST)', async () => {
 		vi.doMock('uuid', () => ({
 			v4: vi.fn().mockReturnValue(stubMayor.id),
 		}));
+		expectNewGame();
+	});
 
-		const handler = await import('@/server/api/games/index.post');
-		const response = await handler.default(event);
+	it('should trim the end of a nickname', async () => {
+		vi.stubGlobal('readBody', vi.fn().mockResolvedValue({ mayor: stubMayor.nickname + ' ' }));
+		vi.doMock('uuid', () => ({
+			v4: vi.fn().mockReturnValue(stubMayor.id),
+		}));
+		expectNewGame();
+	});
 
-		expect(response).not.toBeNull();
-		expect(response).toEqual(
-			expect.objectContaining({
-				id: stubGameNew.id,
-				active: false,
-				players: stubGameNew.players,
-			})
+	it('should trim the start of a nickname', async () => {
+		vi.stubGlobal('readBody', vi.fn().mockResolvedValue({ mayor: ' ' + stubMayor.nickname }));
+		vi.doMock('uuid', () => ({
+			v4: vi.fn().mockReturnValue(stubMayor.id),
+		}));
+		expectNewGame();
+	});
+
+	it('should trim both ends of a nickname', async () => {
+		vi.stubGlobal(
+			'readBody',
+			vi.fn().mockResolvedValue({ mayor: ' ' + stubMayor.nickname + ' ' })
 		);
-		expect(mockResponseStatus).toBeCalledWith(event, 200);
+		vi.doMock('uuid', () => ({
+			v4: vi.fn().mockReturnValue(stubMayor.id),
+		}));
+		expectNewGame();
 	});
 
 	it('should return an ErrorResponse (with validation messages) if the values are invalid', async () => {
 		const handler = await import('@/server/api/games/index.post');
 
-		const names = ['Jim', 'Jim James Jimmy Jameson', 'Jim-Bob'];
-		const errors = ['nickname-min', 'nickname-max', 'nickname-invalid'];
-		for (let n = 0; n < names.length; n++) {
-			vi.stubGlobal('readBody', vi.fn().mockResolvedValue({ mayor: names[n] }));
+		for (const name of stubInvalidNicknames) {
+			vi.stubGlobal('readBody', vi.fn().mockResolvedValue({ mayor: name.nickname }));
 
 			const error = stubErrorNickname;
-			error.errors[0].message = errors[n];
+			error.errors[0].message = name.error;
 			const response = await handler.default(event);
 
 			expect(response).not.toBeNull();

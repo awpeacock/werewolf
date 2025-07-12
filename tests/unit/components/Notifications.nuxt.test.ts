@@ -18,6 +18,8 @@ import { server, spyApi } from '@tests/unit/setup/api';
 import { mockT, setLocalePath } from '@tests/unit/setup/i18n';
 import { mockWSLatest, mockWSRemove } from '@tests/unit/setup/websocket';
 
+type WebSocketType = 'join-request' | 'invite-accept' | 'admission';
+
 describe('Notifications', async () => {
 	const game = useGameStore();
 	const player = usePlayerStore();
@@ -29,6 +31,84 @@ describe('Notifications', async () => {
 		game.set(g);
 		player.$reset();
 		player.set(p);
+	};
+
+	const setupComponent = async (
+		locale: string,
+		game?: Game,
+		player?: Player,
+		pending?: Array<Player>,
+		ws?: Nullable<WebSocketType>
+	): Promise<VueWrapper<InstanceType<typeof Notifications>>> => {
+		setLocalePath(locale);
+		if (game && player) {
+			setupStores(game, player);
+		}
+
+		const wrapper = await mountSuspended(Notifications, {
+			global: {
+				mocks: {
+					$t: mockT,
+				},
+			},
+		});
+
+		expectInitial(wrapper, game, player);
+		if (player && pending) {
+			await setupRequest(game, pending, ws);
+			expectPending(wrapper, pending, player, ws);
+		}
+		return wrapper;
+	};
+
+	const expectInitial = (wrapper: VueWrapper, game?: Game, player?: Player) => {
+		if (!game || !player || game.id === stubGameNew.id || player.id !== stubMayor.id) {
+			expect(wrapper.text()).toEqual('');
+			expect(wrapper.findComponent({ name: 'YesNo' }).exists()).toBeFalsy();
+		}
+	};
+
+	const setupRequest = async (
+		game?: Game,
+		pending?: Array<Player>,
+		ws?: Nullable<WebSocketType>
+	) => {
+		if (ws !== undefined && pending) {
+			for (const p of pending) {
+				if (ws === null) {
+					mockWSLatest.value = null;
+				} else {
+					mockWSLatest.value = {
+						type: ws,
+						game: game,
+						player: p,
+					};
+				}
+				await nextTick();
+			}
+		}
+	};
+
+	const expectPending = (
+		wrapper: VueWrapper,
+		pending: Array<Player>,
+		player: Player,
+		ws?: Nullable<'join-request' | 'invite-accept' | 'admission'>
+	) => {
+		const visible = player.id === stubMayor.id && (ws === undefined || ws === 'join-request');
+		if (visible) {
+			expect(wrapper.findComponent({ name: 'YesNo' }).exists()).toBeTruthy();
+			expect(wrapper.text()).toContain(' waiting-to-be-admitted');
+
+			for (const p of pending) {
+				expect(wrapper.text()).toContain(p.nickname);
+			}
+		} else {
+			expect(wrapper.findComponent({ name: 'YesNo' }).exists()).toBeFalsy();
+			for (const p of pending) {
+				expect(wrapper.text()).not.toContain(p.nickname);
+			}
+		}
 	};
 
 	const triggerUpdate = async (
@@ -84,213 +164,71 @@ describe('Notifications', async () => {
 	});
 
 	it.each(['en', 'de'])('should mount successfully', async (locale: string) => {
-		setLocalePath(locale);
-
-		const wrapper = await mountSuspended(Notifications, {
-			global: {
-				mocks: {
-					$t: mockT,
-				},
-			},
-		});
-
-		expect(wrapper.text()).toEqual('');
-		expect(wrapper.findComponent({ name: 'YesNo' }).exists()).toBeFalsy();
+		await setupComponent(locale);
 	});
 
 	it.each(['en', 'de'])(
 		'should display existing requests for the mayor',
 		async (locale: string) => {
-			setLocalePath(locale);
-			setupStores(stubGamePending, stubMayor);
-
-			const wrapper = await mountSuspended(Notifications, {
-				global: {
-					mocks: {
-						$t: mockT,
-					},
-				},
-			});
-
-			expect(wrapper.text()).toContain(stubGamePending.pending![0].nickname);
-			expect(wrapper.text()).toContain(' waiting-to-be-admitted');
-			expect(wrapper.findComponent({ name: 'YesNo' }).exists()).toBeTruthy();
+			await setupComponent(locale, stubGamePending, stubMayor, [stubVillager1]);
 		}
 	);
 
 	it.each(['en', 'de'])(
 		'should hide existing requests for all but the mayor',
 		async (locale: string) => {
-			setLocalePath(locale);
-			setupStores(stubGamePending, stubVillager1);
-
-			const wrapper = await mountSuspended(Notifications, {
-				global: {
-					mocks: {
-						$t: mockT,
-					},
-				},
-			});
-
-			expect(wrapper.text()).toEqual('');
-			expect(wrapper.findComponent({ name: 'YesNo' }).exists()).toBeFalsy();
+			await setupComponent(locale, stubGamePending, stubVillager2, [stubVillager1]);
 		}
 	);
 
 	it.each(['en', 'de'])(
 		'should display incoming requests for the mayor',
 		async (locale: string) => {
-			setLocalePath(locale);
-			setupStores(stubGameNew, stubMayor);
-
-			const wrapper = await mountSuspended(Notifications, {
-				global: {
-					mocks: {
-						$t: mockT,
-					},
-				},
-			});
-
-			expect(wrapper.text()).toEqual('');
-
-			mockWSLatest.value = {
-				type: 'join-request',
-				game: stubGameNew,
-				player: stubVillager1,
-			};
-
-			await nextTick();
-			expect(wrapper.text()).toContain(stubVillager1.nickname);
-			expect(wrapper.findComponent({ name: 'YesNo' }).exists()).toBeTruthy();
+			await setupComponent(locale, stubGameNew, stubMayor, [stubVillager1], 'join-request');
 		}
 	);
 
 	it.each(['en', 'de'])(
 		'should NOT display incoming requests for other villagers',
 		async (locale: string) => {
-			setLocalePath(locale);
-			setupStores(stubGameNew, stubVillager1);
-
-			const wrapper = await mountSuspended(Notifications, {
-				global: {
-					mocks: {
-						$t: mockT,
-					},
-				},
-			});
-
-			expect(wrapper.text()).toEqual('');
-
-			mockWSLatest.value = {
-				type: 'join-request',
-				game: stubGameNew,
-				player: stubVillager2,
-			};
-
-			await nextTick();
-			expect(wrapper.text()).not.toContain(stubVillager1.nickname);
-			expect(wrapper.findComponent({ name: 'YesNo' }).exists()).toBeFalsy();
+			await setupComponent(
+				locale,
+				stubGameNew,
+				stubVillager1,
+				[stubVillager2],
+				'join-request'
+			);
 		}
 	);
 
 	it.each(['en', 'de'])(
 		'should update game state on invitation acceptances',
 		async (locale: string) => {
-			setLocalePath(locale);
-			setupStores(stubGameNew, stubMayor);
-
-			const wrapper = await mountSuspended(Notifications, {
-				global: {
-					mocks: {
-						$t: mockT,
-					},
-				},
-			});
-
-			expect(wrapper.text()).toEqual('');
-
-			mockWSLatest.value = {
-				type: 'invite-accept',
-				game: stubGameNew,
-				player: stubVillager1,
-			};
-
-			await nextTick();
-			expect(wrapper.text()).not.toContain(stubVillager1.nickname);
-			expect(wrapper.findComponent({ name: 'YesNo' }).exists()).not.toBeTruthy();
+			await setupComponent(locale, stubGameNew, stubMayor, [stubVillager1], 'invite-accept');
 		}
 	);
 
 	it.each(['en', 'de'])(
 		'should ignore any events that are not join requests or invite accepts',
 		async (locale: string) => {
-			setLocalePath(locale);
-			setupStores(stubGameNew, stubMayor);
-
-			const wrapper = await mountSuspended(Notifications, {
-				global: {
-					mocks: {
-						$t: mockT,
-					},
-				},
-			});
-
-			expect(wrapper.text()).toEqual('');
-
-			mockWSLatest.value = {
-				type: 'admission',
-				game: stubGameNew,
-				response: false,
-			};
-
-			await nextTick();
-			expect(wrapper.text()).toEqual('');
+			await setupComponent(locale, stubGameNew, stubMayor, [], 'admission');
 		}
 	);
 
 	it.each(['en', 'de'])('should ignore any null events', async (locale: string) => {
-		setLocalePath(locale);
-		setupStores(stubGameNew, stubMayor);
-
-		const wrapper = await mountSuspended(Notifications, {
-			global: {
-				mocks: {
-					$t: mockT,
-				},
-			},
-		});
-
-		expect(wrapper.text()).toEqual('');
-
-		mockWSLatest.value = null;
-
-		await nextTick();
-		expect(wrapper.text()).toEqual('');
+		await setupComponent(locale, stubGameNew, stubMayor, [], null);
 	});
 
 	it.each(['en', 'de'])(
 		'should trigger the correct update if admitted',
 		async (locale: string) => {
-			setLocalePath(locale);
-			setupStores(stubGameNew, stubMayor);
-
-			const wrapper = await mountSuspended(Notifications, {
-				global: {
-					mocks: {
-						$t: mockT,
-					},
-				},
-			});
-
-			expect(wrapper.text()).toEqual('');
-
-			mockWSLatest.value = {
-				type: 'join-request',
-				game: stubGameNew,
-				player: stubVillager1,
-			};
-
-			await nextTick();
+			const wrapper = await setupComponent(
+				locale,
+				stubGameNew,
+				stubMayor,
+				[stubVillager1],
+				'join-request'
+			);
 
 			const body: Undefinable<AdmissionBody> = await triggerUpdate(
 				wrapper,
@@ -304,26 +242,13 @@ describe('Notifications', async () => {
 	);
 
 	it.each(['en', 'de'])('should trigger the correct update if denied', async (locale: string) => {
-		setLocalePath(locale);
-		setupStores(stubGameNew, stubMayor);
-
-		const wrapper = await mountSuspended(Notifications, {
-			global: {
-				mocks: {
-					$t: mockT,
-				},
-			},
-		});
-
-		expect(wrapper.text()).toEqual('');
-
-		mockWSLatest.value = {
-			type: 'join-request',
-			game: stubGameNew,
-			player: stubVillager1,
-		};
-
-		await nextTick();
+		const wrapper = await setupComponent(
+			locale,
+			stubGameNew,
+			stubMayor,
+			[stubVillager1],
+			'join-request'
+		);
 
 		const body: Undefinable<AdmissionBody> = await triggerUpdate(
 			wrapper,
@@ -338,38 +263,17 @@ describe('Notifications', async () => {
 	it.each(['en', 'de'])(
 		'should correctly update for multiple requests',
 		async (locale: string) => {
+			const wrapper = await setupComponent(
+				locale,
+				stubGameNew,
+				stubMayor,
+				[stubVillager1, stubVillager2],
+				'join-request'
+			);
+
 			setLocalePath(locale);
 			setupStores(stubGameNew, stubMayor);
 
-			const wrapper = await mountSuspended(Notifications, {
-				global: {
-					mocks: {
-						$t: mockT,
-					},
-				},
-			});
-
-			expect(wrapper.text()).toEqual('');
-
-			mockWSLatest.value = {
-				type: 'join-request',
-				game: stubGameNew,
-				player: stubVillager1,
-			};
-
-			await nextTick();
-
-			mockWSLatest.value = {
-				type: 'join-request',
-				game: stubGameNew,
-				player: stubVillager2,
-			};
-
-			await nextTick();
-
-			expect(wrapper.text()).toContain(stubVillager1.nickname);
-			expect(wrapper.text()).toContain(stubVillager2.nickname);
-			expect(wrapper.findComponent({ name: 'YesNo' }).exists()).toBeTruthy();
 			let yesnos = wrapper.findAllComponents({ name: 'YesNo' });
 			expect(yesnos.length).toBe(2);
 
@@ -400,27 +304,13 @@ describe('Notifications', async () => {
 
 	it.each(['en', 'de'])('should handle errors correctly', async (locale: string) => {
 		const spyError = vi.spyOn(console, 'error').mockImplementation(() => null);
-
-		setLocalePath(locale);
-		setupStores(stubGameNew, stubMayor);
-
-		const wrapper = await mountSuspended(Notifications, {
-			global: {
-				mocks: {
-					$t: mockT,
-				},
-			},
-		});
-
-		expect(wrapper.text()).toEqual('');
-
-		mockWSLatest.value = {
-			type: 'join-request',
-			game: stubGameNew,
-			player: stubVillager1,
-		};
-
-		await nextTick();
+		const wrapper = await setupComponent(
+			locale,
+			stubGameNew,
+			stubMayor,
+			[stubVillager1],
+			'join-request'
+		);
 
 		const body: Undefinable<AdmissionBody> = await triggerUpdate(
 			wrapper,
@@ -435,26 +325,13 @@ describe('Notifications', async () => {
 
 	it.each(['en', 'de'])('remove the error message when clicked on', async (locale: string) => {
 		const spyError = vi.spyOn(console, 'error').mockImplementation(() => null);
-		setLocalePath(locale);
-		setupStores(stubGameNew, stubMayor);
-
-		const wrapper = await mountSuspended(Notifications, {
-			global: {
-				mocks: {
-					$t: mockT,
-				},
-			},
-		});
-
-		expect(wrapper.text()).toEqual('');
-
-		mockWSLatest.value = {
-			type: 'join-request',
-			game: stubGameNew,
-			player: stubVillager1,
-		};
-
-		await nextTick();
+		const wrapper = await setupComponent(
+			locale,
+			stubGameNew,
+			stubMayor,
+			[stubVillager1],
+			'join-request'
+		);
 
 		const body: Undefinable<AdmissionBody> = await triggerUpdate(
 			wrapper,

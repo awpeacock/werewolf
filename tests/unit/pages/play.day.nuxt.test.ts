@@ -1,10 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { mountSuspended } from '@nuxt/test-utils/runtime';
 import { flushPromises } from '@vue/test-utils';
 import type { VueWrapper } from '@vue/test-utils';
-import { http, HttpResponse } from 'msw';
 
-import page from '@/pages/play/[[id]].vue';
 import BouncingDots from '@/components/BouncingDots.vue';
 import { GameIdNotFoundErrorResponse, UnauthorisedErrorResponse } from '@/types/constants';
 
@@ -26,11 +23,8 @@ import {
 	stubVotesTie,
 	stubWolf,
 } from '@tests/common/stubs';
-import { waitFor } from '@tests/unit/setup/global';
-import { server, spyApi } from '@tests/unit/setup/api';
 import { mockGame } from '@tests/unit/setup/game';
-import { mockT, setLocale } from '@tests/unit/setup/i18n';
-import { stubNuxtLink } from '@tests/unit/setup/navigation';
+import { setupPage, triggerAction } from '@tests/unit/setup/page';
 import { setupRuntimeConfigForApis } from '@tests/unit/setup/runtime';
 import { mockWSLatest } from '@tests/unit/setup/websocket';
 
@@ -40,73 +34,124 @@ describe('Play Game (Day time) page', () => {
 	const storeGame = useGameStore();
 	const storePlayer = usePlayerStore();
 
-	const url = '/api/games/';
-
-	const setupPage = async (
+	const injectSession = async (
 		locale: string,
-		route?: string
-	): Promise<VueWrapper<InstanceType<typeof page>>> => {
-		setLocale(locale);
+		game: Game,
+		player: Player
+	): Promise<[VueWrapper, Game]> => {
+		const clone = structuredClone(game);
+		storeGame.set(clone);
+		mockGame.getLatest = vi.fn().mockReturnValue(clone);
+		storePlayer.set(structuredClone(player));
+		const wrapper = await setupPage(locale, '/play/' + clone.id);
 
-		const wrapper = await mountSuspended(page, {
-			global: {
-				mocks: {
-					$t: mockT,
-				},
-				stubs: {
-					NuxtLink: stubNuxtLink,
-				},
-			},
-			route: route ?? '/play',
-		});
+		await wrapper.find('a').trigger('click');
+		await flushPromises();
+		return [wrapper, clone];
+	};
+
+	const triggerEvictionVillager = async (locale: string): Promise<[VueWrapper, Game]> => {
+		const [wrapper, game] = await injectSession(locale, stubGameIncorrectVotes2, stubVillager7);
+		const result = structuredClone(game);
+		result.activities!.at(-1)!.votes![stubVillager7.id] = stubVillager6.id;
+		result.activities!.at(-1)!.evicted = stubVillager6.id;
+		await triggerAction(wrapper, 'vote', game, stubVillager7, true, 200, result);
+
+		mockWSLatest.value = {
+			type: 'eviction',
+			game: result,
+			player: stubVillager6,
+		};
+		await flushPromises();
+
+		expect(wrapper.text()).toContain(`you-have-not-chosen-the-wolf (${locale})`);
+		expect(wrapper.text()).toContain(
+			`you-have-evicted {evicted: ${stubVillager6.nickname}}  (${locale})`
+		);
+		return [wrapper, result];
+	};
+
+	const triggerEvictionWolf = async (locale: string): Promise<[VueWrapper, Game]> => {
+		const game = structuredClone(stubGameIncorrectVotes1);
+		const { [stubWolf.id]: _, ...remainingVotes } = game.activities!.at(-1)!.votes!;
+		game.activities!.at(-1)!.votes = remainingVotes;
+		const [wrapper, result] = await injectSession(locale, game, stubWolf);
+
+		result.activities!.at(-1)!.votes![stubVillager6.id] = stubWolf.id;
+		result.activities!.at(-1)!.votes![stubWolf.id] = stubVillager6.id;
+		result.activities!.at(-1)!.evicted = stubVillager6.id;
+		await triggerAction(wrapper, 'vote', game, stubWolf, true, 200, result);
+
+		mockWSLatest.value = {
+			type: 'eviction',
+			game: result,
+			player: stubVillager6, // null,
+		};
+		await flushPromises();
+		return [wrapper, game];
+	};
+
+	const triggerTie = async (locale: string): Promise<VueWrapper> => {
+		const game = structuredClone(stubGameTie);
+		game.activities!.at(-1)!.votes = structuredClone(stubVotesTie);
+		const [wrapper, result] = await injectSession(locale, game, stubVillager6);
+
+		result.activities!.at(-1)!.votes![stubVillager6.id] = stubWolf.id;
+		result.activities!.at(-1)!.evicted = null;
+		await triggerAction(wrapper, 'vote', game, stubVillager6, true, 200, result);
+
+		mockWSLatest.value = {
+			type: 'eviction',
+			game: result,
+			player: null,
+		};
+		await flushPromises();
 		return wrapper;
 	};
 
-	const triggerVote = async (
-		wrapper: VueWrapper,
+	const triggerEndGame = async (
+		locale: string,
 		game: Game,
 		player: Player,
-		submit: boolean,
-		responseCode?: number,
-		responseData?: object
+		target: Player,
+		winner: 'wolf' | 'village',
+		ws: boolean
 	) => {
-		let body;
-		server.use(
-			http.put(url + game.id + '/day', async ({ request }) => {
-				body = await request.json();
-				spyApi(body);
-				return HttpResponse.json(responseData, { status: responseCode });
-			})
-		);
+		const [wrapper, result] = await injectSession(locale, game, player);
 
-		const button = wrapper.find('button');
-		const name = button.text();
-		let voting = false;
-		for (const p of game.players) {
-			if (p.nickname === name) {
-				voting = true;
-			}
+		result.activities!.at(-1)!.votes![player.id] = target.id;
+		result.active = false;
+		result.winner = winner;
+		result.finished = new Date();
+		await triggerAction(wrapper, 'vote', game, player, true, 200, result);
+
+		if (ws) {
+			mockWSLatest.value = {
+				type: 'game-over',
+				game: result,
+			};
+			await flushPromises();
 		}
-		expect(voting).toBeTruthy();
-		button.trigger('click');
-		await flushPromises();
-		await nextTick();
 
-		if (submit) {
-			await waitFor(() => !wrapper.findComponent({ name: 'Spinner' }).exists());
-			expect(spyApi).toHaveBeenCalled();
-			const target = storeGame.findPlayer(button.text());
-			expect(body).toEqual({ player: player.id, vote: target!.id });
-			// Make sure we no longer have any voting options
-			if (responseCode === 200) {
-				const buttons = wrapper.findAll('button');
-				for (const p of game.players) {
-					const button = buttons.filter((b) => b.text().includes(p.nickname));
-					expect(button.length).toBe(0);
-				}
+		expect(wrapper.text()).toContain(`game-over (${locale})`);
+		if (player.id !== stubWolf.id) {
+			if (winner === 'village') {
+				expect(wrapper.text()).toContain(`congratulations-village (${locale})`);
+			} else {
+				expect(wrapper.text()).toContain(`you-lost-village (${locale})`);
 			}
+			expect(wrapper.text()).toContain(
+				`the-wolf-was {wolf: ${stubWolf.nickname}}  (${locale})`
+			);
 		} else {
-			expect(spyApi).not.toHaveBeenCalled();
+			if (winner === 'village') {
+				expect(wrapper.text()).toContain(`you-lost-wolf (${locale})`);
+			} else {
+				expect(wrapper.text()).toContain(`congratulations-wolf (${locale})`);
+			}
+			expect(wrapper.text()).not.toContain(
+				`the-wolf-was {wolf: ${stubWolf.nickname}}  (${locale})`
+			);
 		}
 	};
 
@@ -140,17 +185,17 @@ describe('Play Game (Day time) page', () => {
 			storeGame.set(structuredClone(stubGameIncompleteActivity));
 			mockGame.getLatest = vi.fn().mockReturnValue(stubGameIncompleteActivity);
 			const players = [stubWolf, stubHealer, stubMayor, stubVillager7, stubVillager8];
-			for (let p = 0; p < players.length; p++) {
-				storePlayer.set(structuredClone(players[p]));
+			for (const player of players) {
+				storePlayer.set(structuredClone(player));
 				const wrapper = await setupPage(locale, '/play/' + stubGameIncompleteActivity.id);
 
-				await wrapper.find('button').trigger('click');
+				await wrapper.find('a').trigger('click');
 				await flushPromises();
 
 				expect(wrapper.text()).toContain(`day-time (${locale})`);
 				expect(wrapper.text()).toContain(`time-for-the-village-to-vote (${locale})`);
 
-				const buttons = wrapper.findAll('button');
+				const buttons = wrapper.findAll('a');
 				expect(buttons.length).toBe(4);
 			}
 		}
@@ -165,11 +210,11 @@ describe('Play Game (Day time) page', () => {
 			storeGame.set(game);
 			mockGame.getLatest = vi.fn().mockReturnValue(game);
 			const players = [stubVillager7, stubVillager8];
-			for (let p = 0; p < players.length; p++) {
-				storePlayer.set(structuredClone(players[p]));
+			for (const player of players) {
+				storePlayer.set(structuredClone(player));
 				const wrapper = await setupPage(locale, '/play/' + stubGameWolfWin.id);
 
-				await wrapper.find('button').trigger('click');
+				await wrapper.find('a').trigger('click');
 				await flushPromises();
 
 				expect(wrapper.text()).toContain(`day-time (${locale})`);
@@ -189,7 +234,7 @@ describe('Play Game (Day time) page', () => {
 			storePlayer.set(structuredClone(stubVillager6));
 			const wrapper = await setupPage(locale, '/play/' + stubGameWolfWin.id);
 
-			await wrapper.find('button').trigger('click');
+			await wrapper.find('a').trigger('click');
 			await flushPromises();
 
 			expect(wrapper.text()).toContain(`day-time (${locale})`);
@@ -213,7 +258,7 @@ describe('Play Game (Day time) page', () => {
 				storePlayer.set(structuredClone(stubGameIncompleteActivity.players[p]));
 				const wrapper = await setupPage(locale, '/play/' + stubGameIncompleteActivity.id);
 
-				await wrapper.find('button').trigger('click');
+				await wrapper.find('a').trigger('click');
 				await flushPromises();
 
 				// Have them vote for the mayor as that will be the first button
@@ -221,7 +266,7 @@ describe('Play Game (Day time) page', () => {
 				game.activities!.at(-1)!.votes = {};
 				game.activities!.at(-1)!.votes![stubGameIncompleteActivity.players[p].id] =
 					stubMayor.id;
-				await triggerVote(wrapper, game, game.players[p], true, 200, game);
+				await triggerAction(wrapper, 'vote', game, game.players[p], true, 200, game);
 
 				expect(wrapper.text()).toContain(`you-have-voted (${locale})`);
 				expect(wrapper.findComponent(BouncingDots).exists()).toBeTruthy();
@@ -238,13 +283,13 @@ describe('Play Game (Day time) page', () => {
 			storePlayer.set(structuredClone(stubVillager6));
 			const wrapper = await setupPage(locale, '/play/' + stubGameIncorrectVotes1.id);
 
-			await wrapper.find('button').trigger('click');
+			await wrapper.find('a').trigger('click');
 			await flushPromises();
 
 			game.stage = 'night';
 			game.activities!.at(-1)!.votes![stubVillager6.id] = stubMayor.id;
 			game.activities!.at(-1)!.evicted = stubVillager6.id;
-			await triggerVote(wrapper, game, stubVillager6, true, 200, game);
+			await triggerAction(wrapper, 'vote', game, stubVillager6, true, 200, game);
 
 			expect(wrapper.text()).toContain(`you-have-been-evicted (${locale})`);
 		}
@@ -253,58 +298,14 @@ describe('Play Game (Day time) page', () => {
 	it.each(['en', 'de'])(
 		'should present the results for all players when all votes are in and the game is still on (with an eviction)',
 		async (locale: string) => {
-			const game = structuredClone(stubGameIncorrectVotes2);
-			storeGame.set(game);
-			mockGame.getLatest = vi.fn().mockReturnValue(game);
-			storePlayer.set(structuredClone(stubVillager7));
-			const wrapper = await setupPage(locale, '/play/' + game.id);
-
-			await wrapper.find('button').trigger('click');
-			await flushPromises();
-
-			const result = structuredClone(game);
-			result.activities!.at(-1)!.votes![stubVillager7.id] = stubVillager6.id;
-			result.activities!.at(-1)!.evicted = stubVillager6.id;
-			await triggerVote(wrapper, game, stubVillager7, true, 200, result);
-
-			mockWSLatest.value = {
-				type: 'eviction',
-				game: result,
-				player: stubVillager6,
-			};
-			await flushPromises();
-
-			expect(wrapper.text()).toContain(`you-have-not-chosen-the-wolf (${locale})`);
-			expect(wrapper.text()).toContain(
-				`you-have-evicted {evicted: ${stubVillager6.nickname}}  (${locale})`
-			);
+			await triggerEvictionVillager(locale);
 		}
 	);
 
 	it.each(['en', 'de'])(
 		'should present the results for all players when all votes are in and the game is still on (with no eviction)',
 		async (locale: string) => {
-			const game = structuredClone(stubGameTie);
-			game.activities!.at(-1)!.votes = structuredClone(stubVotesTie);
-			storeGame.set(game);
-			mockGame.getLatest = vi.fn().mockReturnValue(game);
-			storePlayer.set(structuredClone(stubVillager6));
-			const wrapper = await setupPage(locale, '/play/' + game.id);
-
-			await wrapper.find('button').trigger('click');
-			await flushPromises();
-
-			const result = structuredClone(game);
-			result.activities!.at(-1)!.votes![stubVillager6.id] = stubWolf.id;
-			result.activities!.at(-1)!.evicted = null;
-			await triggerVote(wrapper, game, stubVillager6, true, 200, result);
-
-			mockWSLatest.value = {
-				type: 'eviction',
-				game: result,
-				player: null,
-			};
-			await flushPromises();
+			const wrapper = await triggerTie(locale);
 
 			expect(wrapper.text()).toContain(`you-have-not-chosen-the-wolf (${locale})`);
 			expect(wrapper.text()).toContain(`you-have-evicted-nobody (${locale})`);
@@ -320,13 +321,13 @@ describe('Play Game (Day time) page', () => {
 			storePlayer.set(structuredClone(stubVillager6));
 			const wrapper = await setupPage(locale, '/play/' + game.id);
 
-			await wrapper.find('button').trigger('click');
+			await wrapper.find('a').trigger('click');
 			await flushPromises();
 
 			const result = structuredClone(game);
 			result.activities!.at(-1)!.votes![stubVillager6.id] = stubWolf.id;
 			result.activities!.at(-1)!.evicted = stubVillager6.id;
-			await triggerVote(wrapper, game, stubVillager6, true, 200, result);
+			await triggerAction(wrapper, 'vote', game, stubVillager6, true, 200, result);
 
 			mockWSLatest.value = {
 				type: 'eviction',
@@ -342,36 +343,14 @@ describe('Play Game (Day time) page', () => {
 	it.each(['en', 'de'])(
 		'should move the screen on to the next night after votes are in and the button is clicked',
 		async (locale: string) => {
-			const game = structuredClone(stubGameIncorrectVotes1);
-			const { [stubWolf.id]: _, ...remainingVotes } = game.activities!.at(-1)!.votes!;
-			game.activities!.at(-1)!.votes = remainingVotes;
-			storeGame.set(game);
-			mockGame.getLatest = vi.fn().mockReturnValue(game);
-			storePlayer.set(structuredClone(stubWolf));
-			const wrapper = await setupPage(locale, '/play/' + game.id);
+			const [wrapper] = await triggerEvictionWolf(locale);
 
-			await wrapper.find('button').trigger('click');
-			await flushPromises();
-
-			const result = structuredClone(game);
-			result.activities!.at(-1)!.votes![stubVillager6.id] = stubWolf.id;
-			result.activities!.at(-1)!.votes![stubWolf.id] = stubVillager6.id;
-			result.activities!.at(-1)!.evicted = stubVillager6.id;
-			await triggerVote(wrapper, game, stubWolf, true, 200, result);
-
-			mockWSLatest.value = {
-				type: 'eviction',
-				game: result,
-				player: null,
-			};
-			await flushPromises();
-
-			const button = wrapper.find('button');
+			const button = wrapper.find('a');
 			await button.trigger('click');
 			await flushPromises();
 
 			expect(wrapper.text()).toContain('night-descends');
-			const buttons = wrapper.findAll('button');
+			const buttons = wrapper.findAll('a');
 			expect(buttons.length).toBe(3);
 		}
 	);
@@ -379,36 +358,14 @@ describe('Play Game (Day time) page', () => {
 	it.each(['en', 'de'])(
 		'should handle an empty activity when the screen is moved on to the next night',
 		async (locale: string) => {
-			const game = structuredClone(stubGameIncorrectVotes1);
-			const { [stubWolf.id]: _, ...remainingVotes } = game.activities!.at(-1)!.votes!;
-			game.activities!.at(-1)!.votes = remainingVotes;
-			storeGame.set(game);
-			mockGame.getLatest = vi.fn().mockReturnValue(game);
-			storePlayer.set(structuredClone(stubWolf));
-			const wrapper = await setupPage(locale, '/play/' + game.id);
-
-			await wrapper.find('button').trigger('click');
-			await flushPromises();
-
-			const result = structuredClone(game);
-			result.activities!.at(-1)!.votes![stubVillager6.id] = stubWolf.id;
-			result.activities!.at(-1)!.votes![stubWolf.id] = stubVillager6.id;
-			result.activities!.at(-1)!.evicted = stubVillager6.id;
-			await triggerVote(wrapper, game, stubWolf, true, 200, result);
-
-			mockWSLatest.value = {
-				type: 'eviction',
-				game: result,
-				player: null,
-			};
-			await flushPromises();
+			const [wrapper, game] = await triggerEvictionWolf(locale);
 
 			game.activities = [];
 			storeGame.set(game);
 			mockGame.getLatest = vi.fn().mockReturnValue(game);
 			storePlayer.set(structuredClone(stubWolf));
 
-			const button = wrapper.find('button');
+			const button = wrapper.find('a');
 			await button.trigger('click');
 			await flushPromises();
 
@@ -419,36 +376,14 @@ describe('Play Game (Day time) page', () => {
 	it.each(['en', 'de'])(
 		'should handle an incomplete activity when the screen is moved on to the next night',
 		async (locale: string) => {
-			const game = structuredClone(stubGameIncorrectVotes1);
-			const { [stubWolf.id]: _, ...remainingVotes } = game.activities!.at(-1)!.votes!;
-			game.activities!.at(-1)!.votes = remainingVotes;
-			storeGame.set(game);
-			mockGame.getLatest = vi.fn().mockReturnValue(game);
-			storePlayer.set(structuredClone(stubWolf));
-			const wrapper = await setupPage(locale, '/play/' + game.id);
-
-			await wrapper.find('button').trigger('click');
-			await flushPromises();
-
-			const result = structuredClone(game);
-			result.activities!.at(-1)!.votes![stubVillager6.id] = stubWolf.id;
-			result.activities!.at(-1)!.votes![stubWolf.id] = stubVillager6.id;
-			result.activities!.at(-1)!.evicted = stubVillager6.id;
-			await triggerVote(wrapper, game, stubWolf, true, 200, result);
-
-			mockWSLatest.value = {
-				type: 'eviction',
-				game: result,
-				player: null,
-			};
-			await flushPromises();
+			const [wrapper, game] = await triggerEvictionWolf(locale);
 
 			game.activities = [stubActivityIncorrectVotes1];
 			storeGame.set(game);
 			mockGame.getLatest = vi.fn().mockReturnValue(game);
 			storePlayer.set(structuredClone(stubWolf));
 
-			const button = wrapper.find('button');
+			const button = wrapper.find('a');
 			await button.trigger('click');
 			await flushPromises();
 
@@ -459,29 +394,8 @@ describe('Play Game (Day time) page', () => {
 	it.each(['en', 'de'])(
 		'should override the state of the game for a standard villager if the wolf/healer have chosen',
 		async (locale: string) => {
-			const game = structuredClone(stubGameTie);
-			game.activities!.at(-1)!.votes = structuredClone(stubVotesTie);
-			storeGame.set(game);
-			mockGame.getLatest = vi.fn().mockReturnValue(game);
-			storePlayer.set(structuredClone(stubVillager6));
-			const wrapper = await setupPage(locale, '/play/' + game.id);
-
-			await wrapper.find('button').trigger('click');
-			await flushPromises();
-
-			const result = structuredClone(game);
-			result.activities!.at(-1)!.votes![stubVillager6.id] = stubWolf.id;
-			result.activities!.at(-1)!.evicted = null;
-			await triggerVote(wrapper, game, stubVillager6, true, 200, result);
-
-			mockWSLatest.value = {
-				type: 'eviction',
-				game: result,
-				player: null,
-			};
-			await flushPromises();
-			await nextTick();
-			const button = wrapper.find('button');
+			const [wrapper, result] = await triggerEvictionVillager(locale);
+			const button = wrapper.find('a');
 			expect(button.text()).toEqual(`continue (${locale})`);
 
 			// Simulate the wolf and healer choosing in the background
@@ -493,11 +407,11 @@ describe('Play Game (Day time) page', () => {
 			result.activities!.push(activity);
 			mockWSLatest.value = {
 				type: 'morning',
-				game: game,
+				game: result, //game,
 			};
 			await flushPromises();
 
-			await wrapper.find('button').trigger('click');
+			await wrapper.find('a').trigger('click');
 			await flushPromises();
 
 			expect(wrapper.text()).toContain('time-for-the-village-to-vote');
@@ -507,29 +421,9 @@ describe('Play Game (Day time) page', () => {
 	it.each(['en', 'de'])(
 		'should not override the state of the game for a villager if the wolf/healer have not chosen',
 		async (locale: string) => {
-			const game = structuredClone(stubGameTie);
-			game.activities!.at(-1)!.votes = structuredClone(stubVotesTie);
-			storeGame.set(game);
-			mockGame.getLatest = vi.fn().mockReturnValue(game);
-			storePlayer.set(structuredClone(stubVillager6));
-			const wrapper = await setupPage(locale, '/play/' + game.id);
+			const wrapper = await triggerTie(locale);
 
-			await wrapper.find('button').trigger('click');
-			await flushPromises();
-
-			const result = structuredClone(game);
-			result.activities!.at(-1)!.votes![stubVillager6.id] = stubWolf.id;
-			result.activities!.at(-1)!.evicted = null;
-			await triggerVote(wrapper, game, stubVillager6, true, 200, result);
-
-			mockWSLatest.value = {
-				type: 'eviction',
-				game: result,
-				player: null,
-			};
-			await flushPromises();
-
-			await wrapper.find('button').trigger('click');
+			await wrapper.find('a').trigger('click');
 			await flushPromises();
 
 			expect(wrapper.text()).toContain('we-wait');
@@ -539,26 +433,13 @@ describe('Play Game (Day time) page', () => {
 	it.each(['en', 'de'])(
 		'should present the end screen for the last voter (without the need for a socket event) and the wolf has been found (for the villagers)',
 		async (locale: string) => {
-			const game = structuredClone(stubGameCorrectVotes);
-			storeGame.set(structuredClone(game));
-			mockGame.getLatest = vi.fn().mockReturnValue(game);
-			storePlayer.set(structuredClone(stubVillager6));
-			const wrapper = await setupPage(locale, '/play/' + game.id);
-
-			await wrapper.find('button').trigger('click');
-			await flushPromises();
-
-			const result = structuredClone(game);
-			result.activities!.at(-1)!.votes![stubVillager6.id] = stubMayor.id;
-			result.active = false;
-			result.winner = 'village';
-			result.finished = new Date();
-			await triggerVote(wrapper, game, stubVillager6, true, 200, result);
-
-			expect(wrapper.text()).toContain(`game-over (${locale})`);
-			expect(wrapper.text()).toContain(`congratulations-village (${locale})`);
-			expect(wrapper.text()).toContain(
-				`the-wolf-was {wolf: ${stubWolf.nickname}}  (${locale})`
+			await triggerEndGame(
+				locale,
+				stubGameCorrectVotes,
+				stubVillager6,
+				stubMayor,
+				'village',
+				false
 			);
 		}
 	);
@@ -566,30 +447,13 @@ describe('Play Game (Day time) page', () => {
 	it.each(['en', 'de'])(
 		'should present the end screen when all votes are in and the wolf has been found (for the villagers)',
 		async (locale: string) => {
-			const game = structuredClone(stubGameCorrectVotes);
-			storeGame.set(structuredClone(game));
-			mockGame.getLatest = vi.fn().mockReturnValue(game);
-			storePlayer.set(structuredClone(stubVillager6));
-			const wrapper = await setupPage(locale, '/play/' + game.id);
-
-			await wrapper.find('button').trigger('click');
-			await flushPromises();
-
-			const result = structuredClone(game);
-			result.activities!.at(-1)!.votes![stubVillager6.id] = stubMayor.id;
-			result.winner = 'village';
-			await triggerVote(wrapper, game, stubVillager6, true, 200, result);
-
-			mockWSLatest.value = {
-				type: 'game-over',
-				game: result,
-			};
-			await flushPromises();
-
-			expect(wrapper.text()).toContain(`game-over (${locale})`);
-			expect(wrapper.text()).toContain(`congratulations-village (${locale})`);
-			expect(wrapper.text()).toContain(
-				`the-wolf-was {wolf: ${stubWolf.nickname}}  (${locale})`
+			await triggerEndGame(
+				locale,
+				stubGameCorrectVotes,
+				stubVillager6,
+				stubMayor,
+				'village',
+				true
 			);
 		}
 	);
@@ -600,87 +464,21 @@ describe('Play Game (Day time) page', () => {
 			const game = structuredClone(stubGameCorrectVotes);
 			const { [stubWolf.id]: _, ...remainingVotes } = game.activities!.at(-1)!.votes!;
 			game.activities!.at(-1)!.votes = remainingVotes;
-			storeGame.set(game);
-			mockGame.getLatest = vi.fn().mockReturnValue(game);
-			storePlayer.set(structuredClone(stubWolf));
-			const wrapper = await setupPage(locale, '/play/' + game.id);
-
-			await wrapper.find('button').trigger('click');
-			await flushPromises();
-
-			const result = structuredClone(game);
-			result.activities!.at(-1)!.votes![stubWolf.id] = stubVillager6.id;
-			result.winner = 'village';
-			await triggerVote(wrapper, game, stubWolf, true, 200, result);
-
-			mockWSLatest.value = {
-				type: 'game-over',
-				game: result,
-			};
-			await flushPromises();
-
-			expect(wrapper.text()).toContain(`game-over (${locale})`);
-			expect(wrapper.text()).toContain(`you-lost-wolf (${locale})`);
-			expect(wrapper.text()).not.toContain(
-				`the-wolf-was {wolf: ${stubWolf.nickname}}  (${locale})`
-			);
+			await triggerEndGame(locale, game, stubWolf, stubVillager6, 'village', true);
 		}
 	);
 
 	it.each(['en', 'de'])(
 		'should present the end screen for the last voter (without the need for a socket event) and the wolf has won (for the villagers)',
 		async (locale: string) => {
-			const game = structuredClone(stubGameWolfWin);
-			storeGame.set(structuredClone(game));
-			mockGame.getLatest = vi.fn().mockReturnValue(game);
-			storePlayer.set(structuredClone(stubMayor));
-			const wrapper = await setupPage(locale, '/play/' + game.id);
-
-			await wrapper.find('button').trigger('click');
-			await flushPromises();
-
-			const result = structuredClone(game);
-			result.activities!.at(-1)!.votes![stubMayor.id] = stubHealer.id;
-			result.active = false;
-			result.winner = 'wolf';
-			result.finished = new Date();
-			await triggerVote(wrapper, game, stubMayor, true, 200, result);
-
-			expect(wrapper.text()).toContain(`game-over (${locale})`);
-			expect(wrapper.text()).toContain(`you-lost-village (${locale})`);
-			expect(wrapper.text()).toContain(
-				`the-wolf-was {wolf: ${stubWolf.nickname}}  (${locale})`
-			);
+			await triggerEndGame(locale, stubGameWolfWin, stubMayor, stubHealer, 'wolf', false);
 		}
 	);
 
 	it.each(['en', 'de'])(
 		'should present the end screen when all votes are in and the wolf has won (for the villagers)',
 		async (locale: string) => {
-			const game = structuredClone(stubGameWolfWin);
-			storeGame.set(structuredClone(game));
-			mockGame.getLatest = vi.fn().mockReturnValue(game);
-			storePlayer.set(structuredClone(stubMayor));
-			const wrapper = await setupPage(locale, '/play/' + game.id);
-
-			await wrapper.find('button').trigger('click');
-			await flushPromises();
-
-			const result = structuredClone(game);
-			result.activities!.at(-1)!.votes![stubMayor.id] = stubHealer.id;
-			result.winner = 'wolf';
-			await triggerVote(wrapper, game, stubMayor, true, 200, result);
-			mockWSLatest.value = {
-				type: 'game-over',
-				game: result,
-			};
-			await flushPromises();
-
-			expect(wrapper.text()).toContain(`game-over (${locale})`);
-			expect(wrapper.text()).toContain(`you-lost-village (${locale})`);
-			expect(wrapper.text()).toContain(
-				`the-wolf-was {wolf: ${stubWolf.nickname}}  (${locale})`
-			);
+			await triggerEndGame(locale, stubGameWolfWin, stubMayor, stubHealer, 'wolf', true);
 		}
 	);
 
@@ -689,28 +487,9 @@ describe('Play Game (Day time) page', () => {
 		async (locale: string) => {
 			const game = structuredClone(stubGameWolfWin);
 			const { [stubWolf.id]: _, ...remainingVotes } = game.activities!.at(-1)!.votes!;
+			remainingVotes[stubMayor.id] = stubHealer.id;
 			game.activities!.at(-1)!.votes = remainingVotes;
-			storeGame.set(structuredClone(game));
-			mockGame.getLatest = vi.fn().mockReturnValue(game);
-			storePlayer.set(structuredClone(stubWolf));
-			const wrapper = await setupPage(locale, '/play/' + game.id);
-
-			await wrapper.find('button').trigger('click');
-			await flushPromises();
-
-			game.activities!.at(-1)!.votes![stubMayor.id] = stubHealer.id;
-			game.activities!.at(-1)!.votes![stubWolf.id] = stubHealer.id;
-			game.winner = 'wolf';
-			await triggerVote(wrapper, game, stubWolf, true, 200, game);
-
-			mockWSLatest.value = {
-				type: 'game-over',
-				game: game,
-			};
-			await flushPromises();
-
-			expect(wrapper.text()).toContain(`game-over (${locale})`);
-			expect(wrapper.text()).toContain(`congratulations-wolf (${locale})`);
+			await triggerEndGame(locale, game, stubWolf, stubHealer, 'wolf', true);
 		}
 	);
 
@@ -735,20 +514,14 @@ describe('Play Game (Day time) page', () => {
 	it.each(['en', 'de'])(
 		`should handle the wolf accessing the "day" screen without having chosen`,
 		async (locale: string) => {
-			const game = structuredClone(stubGameHealerOnly);
-			game.stage = 'day';
-			storeGame.set(structuredClone(game));
-			mockGame.getLatest = vi.fn().mockReturnValue(game);
-			storePlayer.set(structuredClone(stubWolf));
-			const wrapper = await setupPage(locale, '/play/' + game.id);
-
-			await wrapper.find('button').trigger('click');
-			await flushPromises();
+			const original = structuredClone(stubGameHealerOnly);
+			original.stage = 'day';
+			const [wrapper] = await injectSession(locale, original, stubWolf);
 
 			expect(wrapper.text()).toContain(`night-time (${locale})`);
 			expect(wrapper.text()).toContain(`make-your-decision-the-wolf (${locale})`);
 
-			const buttons = wrapper.findAll('button');
+			const buttons = wrapper.findAll('a');
 			expect(buttons.length).toBe(5);
 		}
 	);
@@ -756,20 +529,14 @@ describe('Play Game (Day time) page', () => {
 	it.each(['en', 'de'])(
 		`should handle the healer accessing the "day" screen without having chosen`,
 		async (locale: string) => {
-			const game = structuredClone(stubGameWolfOnly);
-			game.stage = 'day';
-			storeGame.set(structuredClone(game));
-			mockGame.getLatest = vi.fn().mockReturnValue(game);
-			storePlayer.set(structuredClone(stubHealer));
-			const wrapper = await setupPage(locale, '/play/' + game.id);
-
-			await wrapper.find('button').trigger('click');
-			await flushPromises();
+			const original = structuredClone(stubGameWolfOnly);
+			original.stage = 'day';
+			const [wrapper] = await injectSession(locale, original, stubHealer);
 
 			expect(wrapper.text()).toContain(`night-time (${locale})`);
 			expect(wrapper.text()).toContain(`make-your-decision-the-healer (${locale})`);
 
-			const buttons = wrapper.findAll('button');
+			const buttons = wrapper.findAll('a');
 			expect(buttons.length).toBe(5);
 		}
 	);
@@ -777,15 +544,9 @@ describe('Play Game (Day time) page', () => {
 	it.each(['en', 'de'])(
 		`should handle a villager accessing the "day" screen without the healer and werewolf having chosen`,
 		async (locale: string) => {
-			const game = structuredClone(stubGameHealerOnly);
-			game.stage = 'day';
-			storeGame.set(structuredClone(game));
-			mockGame.getLatest = vi.fn().mockReturnValue(game);
-			storePlayer.set(structuredClone(stubVillager6));
-			const wrapper = await setupPage(locale, '/play/' + game.id);
-
-			await wrapper.find('button').trigger('click');
-			await flushPromises();
+			const original = structuredClone(stubGameHealerOnly);
+			original.stage = 'day';
+			const [wrapper] = await injectSession(locale, original, stubVillager6);
 
 			expect(wrapper.text()).toContain(`night-time (${locale})`);
 			expect(wrapper.text()).toContain(`we-wait (${locale})`);
@@ -795,16 +556,21 @@ describe('Play Game (Day time) page', () => {
 	it.each(['en', 'de'])(
 		'should handle any errors submitting the choices',
 		async (locale: string) => {
-			const game = structuredClone(stubGameIncompleteActivity);
-			storeGame.set(game);
-			mockGame.getLatest = vi.fn().mockReturnValue(stubGameIncompleteActivity);
-			storePlayer.set(structuredClone(stubVillager7));
-			const wrapper = await setupPage(locale, '/play/' + stubGameIncompleteActivity.id);
+			const [wrapper, game] = await injectSession(
+				locale,
+				stubGameIncompleteActivity,
+				stubVillager7
+			);
 
-			await wrapper.find('button').trigger('click');
-			await flushPromises();
-
-			await triggerVote(wrapper, game, stubVillager7, true, 403, UnauthorisedErrorResponse);
+			await triggerAction(
+				wrapper,
+				'vote',
+				game,
+				stubVillager7,
+				true,
+				403,
+				UnauthorisedErrorResponse
+			);
 
 			expect(wrapper.findComponent({ name: 'Error' }).exists()).toBeTruthy();
 			expect(wrapper.text()).toContain('unexpected-error');
@@ -814,16 +580,21 @@ describe('Play Game (Day time) page', () => {
 	it.each(['en', 'de'])(
 		'should handle the error if a choice is made for a non-existent game',
 		async (locale: string) => {
-			const game = structuredClone(stubGameIncompleteActivity);
-			storeGame.set(game);
-			mockGame.getLatest = vi.fn().mockReturnValue(stubGameIncompleteActivity);
-			storePlayer.set(structuredClone(stubVillager7));
-			const wrapper = await setupPage(locale, '/play/' + stubGameIncompleteActivity.id);
+			const [wrapper, game] = await injectSession(
+				locale,
+				stubGameIncompleteActivity,
+				stubVillager7
+			);
 
-			await wrapper.find('button').trigger('click');
-			await flushPromises();
-
-			await triggerVote(wrapper, game, stubVillager7, true, 404, GameIdNotFoundErrorResponse);
+			await triggerAction(
+				wrapper,
+				'vote',
+				game,
+				stubVillager7,
+				true,
+				404,
+				GameIdNotFoundErrorResponse
+			);
 
 			expect(wrapper.findComponent({ name: 'Error' }).exists()).toBeTruthy();
 			expect(wrapper.text()).toContain('game-not-found');

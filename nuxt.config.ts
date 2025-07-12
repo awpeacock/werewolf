@@ -43,6 +43,7 @@ export default defineNuxtConfig({
 		experimental: {
 			websocket: true,
 		},
+		preset: process.env.VERCEL === '1' ? 'vercel' : undefined,
 	},
 	runtimeConfig: {
 		AWS_REGION: process.env.AWS_REGION,

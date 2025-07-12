@@ -19,23 +19,7 @@ test.describe('Play games', () => {
 		'Play a game where the Werewolf wins',
 		async ({ locale, page, browser }) => {
 			const simulation = await simulate(page, locale, '/');
-
-			await simulation.createGame(
-				{
-					parameters: { nickname: nicknames[0] },
-					result: { success: true },
-				},
-				true,
-				true
-			);
-			await expect(page).not.toBeReady();
-
-			await simulation.addPlayers(browser, nicknames);
-			await simulation.handleAdmissions(
-				6,
-				[nicknames[3], nicknames[4], nicknames[6], nicknames[7]],
-				[nicknames[5], nicknames[8]]
-			);
+			await simulation.begin(browser, nicknames);
 
 			// Before we start the game, move one of each of our non-automatic joins on
 			// (again to cover each scenario - moving through to "Play Game" before and
@@ -96,8 +80,6 @@ test.describe('Play games', () => {
 			});
 
 			await simulation.finish();
-			await page.reload();
-			await expect(page).toBeFinished();
 		}
 	);
 
@@ -105,23 +87,7 @@ test.describe('Play games', () => {
 		'Play a game where the Werewolf loses',
 		async ({ locale, page, browser }) => {
 			const simulation = await simulate(page, locale, '/');
-
-			await simulation.createGame(
-				{
-					parameters: { nickname: nicknames[0] },
-					result: { success: true },
-				},
-				true,
-				true
-			);
-			await expect(page).not.toBeReady();
-
-			await simulation.addPlayers(browser, nicknames);
-			await simulation.handleAdmissions(
-				6,
-				[nicknames[3], nicknames[4], nicknames[6], nicknames[7]],
-				[nicknames[5], nicknames[8]]
-			);
+			await simulation.begin(browser, nicknames);
 
 			// For this test, let's not move anybody on till after the mayor has started
 			await expect(page).toBeReady();
@@ -160,8 +126,6 @@ test.describe('Play games', () => {
 			await simulation.vote({ parameters: { majority: simulation.getDetails().wolf! } });
 
 			await simulation.finish();
-			await page.reload();
-			await expect(page).toBeFinished();
 		}
 	);
 
@@ -169,23 +133,7 @@ test.describe('Play games', () => {
 		'Play a game where the Healer gets evicted',
 		async ({ locale, page, browser }) => {
 			const simulation = await simulate(page, locale, '/');
-
-			await simulation.createGame(
-				{
-					parameters: { nickname: nicknames[0] },
-					result: { success: true },
-				},
-				true,
-				true
-			);
-			await expect(page).not.toBeReady();
-
-			await simulation.addPlayers(browser, nicknames);
-			await simulation.handleAdmissions(
-				6,
-				[nicknames[3], nicknames[4], nicknames[6], nicknames[7]],
-				[nicknames[5], nicknames[8]]
-			);
+			await simulation.begin(browser, nicknames);
 
 			// Before we start the game, move one of each of our non-automatic joins on
 			// (this time let's move everybody all on at the first go)
@@ -208,7 +156,7 @@ test.describe('Play games', () => {
 			await simulation.vote({
 				parameters: { killed: dead, majority: simulation.getDetails().healer! },
 			});
-			await simulation.results(simulation.getDetails().healer!);
+			await simulation.results(simulation.getDetails().healer);
 
 			// Next go round, the healer can't choose as they've been evicted
 			await simulation.progress(false);
@@ -225,8 +173,6 @@ test.describe('Play games', () => {
 			});
 
 			await simulation.finish();
-			await page.reload();
-			await expect(page).toBeFinished();
 		}
 	);
 });

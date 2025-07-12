@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mount } from '@vue/test-utils';
+import type { VueWrapper } from '@vue/test-utils';
 
 import { UnexpectedErrorResponse } from '@/types/constants';
 
@@ -12,6 +13,9 @@ interface UseFormFieldReturn {
 	invalidate: (_message: string) => void;
 	reset: () => void;
 }
+type ComponentWithFormfield = {
+	formfield: UseFormFieldReturn;
+};
 
 describe('useFormfield', () => {
 	const single = (error: Ref<undefined | string>) => {
@@ -31,10 +35,52 @@ describe('useFormfield', () => {
 				'<div><div v-for="idx in 2" :key="idx"><input ref="elements" /></div><span>{{ formfield.error }}</span></div>',
 			setup() {
 				const elements = useTemplateRef<HTMLDivElement | null>('elements');
-				const formfield = useFormfield(elements, undefined, error);
+				const formfield = useFormfield(elements, undefined, ref(error));
 				return { formfield };
 			},
 		};
+	};
+
+	const expectOnInput = async (wrapper: VueWrapper) => {
+		const formfield = (wrapper.vm as unknown as ComponentWithFormfield).formfield;
+		const inputs = wrapper.findAll('input');
+		expect(inputs.length).toBe(2);
+		for (const input of inputs.values()) {
+			expect(input.element.oninput).not.toBeNull();
+		}
+
+		await inputs[0].setValue('New ');
+		await inputs[0].trigger('input');
+		await nextTick();
+		expect(formfield.value).toEqual('New ');
+		await inputs[1].setValue('Values');
+		await inputs[1].trigger('input');
+		await nextTick();
+		expect(formfield.value).toEqual('New Values');
+	};
+
+	const expectValidation = async (wrapper: VueWrapper, valid: boolean, reset?: boolean) => {
+		const formfield = (wrapper.vm as unknown as ComponentWithFormfield).formfield;
+		expect(formfield.classes).toContain('bg-yellow');
+
+		if (valid) {
+			formfield.validate(() => UnexpectedErrorResponse.errors);
+			expect(formfield.classes).toContain('bg-red');
+			await nextTick();
+			expect(wrapper.text()).toContain(UnexpectedErrorResponse.errors[0].message);
+
+			formfield.validate(() => []);
+			expect(formfield.classes).toContain('bg-green');
+		} else {
+			formfield.invalidate('Oops');
+			expect(formfield.classes).toContain('bg-red');
+			await nextTick();
+			expect(wrapper.text()).toContain('Oops');
+		}
+		if (reset === true) {
+			formfield.reset();
+			expect(formfield.classes).toContain('bg-yellow');
+		}
 	};
 
 	it('should successfully instantiate with a valid component', async () => {
@@ -110,21 +156,7 @@ describe('useFormfield', () => {
 		const wrapper = mount(array(ref(undefined)));
 		await nextTick();
 
-		const formfield = wrapper.vm.formfield as UseFormFieldReturn;
-		const inputs = wrapper.findAll('input');
-		expect(inputs.length).toBe(2);
-		for (const input of inputs.values()) {
-			expect(input.element.oninput).not.toBeNull();
-		}
-
-		await inputs[0].setValue('New ');
-		await inputs[0].trigger('input');
-		await nextTick();
-		expect(formfield.value).toEqual('New ');
-		await inputs[1].setValue('Values');
-		await inputs[1].trigger('input');
-		await nextTick();
-		expect(formfield.value).toEqual('New Values');
+		await expectOnInput(wrapper);
 	});
 
 	it('should append oninput to an array of inputs via their parents on mount that update the state value', async () => {
@@ -140,107 +172,49 @@ describe('useFormfield', () => {
 		const wrapper = mount(component);
 		await nextTick();
 
-		const formfield = wrapper.vm.formfield as UseFormFieldReturn;
-		const inputs = wrapper.findAll('input');
-		expect(inputs.length).toBe(2);
-		for (const input of inputs.values()) {
-			expect(input.element.oninput).not.toBeNull();
-		}
-
-		await inputs[0].setValue('New ');
-		await inputs[0].trigger('input');
-		await nextTick();
-		expect(formfield.value).toEqual('New ');
-		await inputs[1].setValue('Values');
-		await inputs[1].trigger('input');
-		await nextTick();
-		expect(formfield.value).toEqual('New Values');
+		await expectOnInput(wrapper);
 	});
 
 	it('should successfully validate single inputs based on a callback supplied', async () => {
 		const wrapper = mount(single(ref(undefined)));
 		await nextTick();
 
-		const formfield = wrapper.vm.formfield as UseFormFieldReturn;
-		expect(formfield.classes).toContain('bg-yellow');
-
-		formfield.validate(() => UnexpectedErrorResponse.errors);
-		expect(formfield.classes).toContain('bg-red');
-		await nextTick();
-		expect(wrapper.text()).toContain(UnexpectedErrorResponse.errors[0].message);
-
-		formfield.validate(() => []);
-		expect(formfield.classes).toContain('bg-green');
+		await expectValidation(wrapper, true);
 	});
 
 	it('should successfully validate arrays of inputs based on a callback supplied', async () => {
 		const wrapper = mount(array(ref(undefined)));
 		await nextTick();
 
-		const formfield = wrapper.vm.formfield as UseFormFieldReturn;
-		expect(formfield.classes).toContain('bg-yellow');
-
-		formfield.validate(() => UnexpectedErrorResponse.errors);
-		expect(formfield.classes).toContain('bg-red');
-		await nextTick();
-		expect(wrapper.text()).toContain(UnexpectedErrorResponse.errors[0].message);
-
-		formfield.validate(() => []);
-		expect(formfield.classes).toContain('bg-green');
+		await expectValidation(wrapper, true);
 	});
 
 	it('should successfully invalidate single inputs', async () => {
 		const wrapper = mount(single(ref(undefined)));
 		await nextTick();
 
-		const formfield = wrapper.vm.formfield as UseFormFieldReturn;
-		expect(formfield.classes).toContain('bg-yellow');
-
-		formfield.invalidate('Oops');
-		expect(formfield.classes).toContain('bg-red');
-		await nextTick();
-		expect(wrapper.text()).toContain('Oops');
+		await expectValidation(wrapper, false);
 	});
 
 	it('should successfully invalidate arrays of inputs', async () => {
 		const wrapper = mount(array(ref(undefined)));
 		await nextTick();
 
-		const formfield = wrapper.vm.formfield as UseFormFieldReturn;
-		expect(formfield.classes).toContain('bg-yellow');
-
-		formfield.invalidate('Oops');
-		expect(formfield.classes).toContain('bg-red');
-		await nextTick();
-		expect(wrapper.text()).toContain('Oops');
+		await expectValidation(wrapper, false);
 	});
 
 	it('should successfully reset single inputs', async () => {
 		const wrapper = mount(single(ref(undefined)));
 		await nextTick();
 
-		const formfield = wrapper.vm.formfield as UseFormFieldReturn;
-		expect(formfield.classes).toContain('bg-yellow');
-
-		formfield.invalidate('Oops');
-		expect(formfield.classes).toContain('bg-red');
-
-		formfield.reset();
-		expect(formfield.classes).toContain('bg-yellow');
+		await expectValidation(wrapper, false, true);
 	});
 
 	it('should successfully reset arrays of inputs', async () => {
 		const wrapper = mount(array(ref(undefined)));
 		await nextTick();
 
-		const formfield = wrapper.vm.formfield as UseFormFieldReturn;
-		expect(formfield.classes).toContain('bg-yellow');
-
-		formfield.invalidate('Oops');
-		expect(formfield.classes).toContain('bg-red');
-
-		formfield.reset();
-		expect(formfield.classes).toContain('bg-yellow');
+		await expectValidation(wrapper, false, true);
 	});
 
 	it('should successfully watch an error ref and invalidate single inputs', async () => {

@@ -1,0 +1,16 @@
+{
+	"extends": "./.nuxt/tsconfig.json",
+	"include": [
+		"src/**/*.ts",
+		"src/**/*.tsx",
+		"src/**/*.vue",
+		"tests/**/*.ts",
+		"tests/**/*.tsx",
+		"tests/**/*.vue"
+	],
+	"exclude": ["node_modules", ".nuxt", "dist"],
+	"compilerOptions": {
+		"allowJs": true,
+		"moduleResolution": "node"
+	}
+}

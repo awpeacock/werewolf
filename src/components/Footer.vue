@@ -3,20 +3,20 @@ const route = useRoute();
 
 const current = computed(() => route.meta.footer as FooterMeta | undefined);
 
-const imageA: Ref<Undefinable<FooterMeta>> = ref(current.value);
-const imageB: Ref<Undefinable<FooterMeta>> = ref(current.value);
+const sourceA: Ref<Undefinable<FooterMeta>> = ref(current.value);
+const sourceB: Ref<Undefinable<FooterMeta>> = ref(current.value);
 const opacityA = ref('opacity-100');
 const opacityB = ref('opacity-0');
 
 watch(
 	() => route.meta.footer,
 	(newMeta, oldMeta) => {
-		if (imageA.value === (oldMeta as FooterMeta)) {
-			imageB.value = newMeta as FooterMeta;
+		if (sourceA.value === (oldMeta as FooterMeta)) {
+			sourceB.value = newMeta as FooterMeta;
 			opacityA.value = 'opacity-0';
 			opacityB.value = 'opacity-100';
 		} else {
-			imageA.value = newMeta as FooterMeta;
+			sourceA.value = newMeta as FooterMeta;
 			opacityB.value = 'opacity-0';
 			opacityA.value = 'opacity-100';
 		}
@@ -37,16 +37,16 @@ watch(
 		></div>
 		<div class="flex justify-center mx-4 md:w-[578px] md:mx-auto md:justify-end">
 			<img
-				v-if="imageA"
-				:src="imageA.src"
-				:alt="$t(imageA.alt)"
+				v-if="sourceA"
+				:src="sourceA.src"
+				:alt="$t(sourceA.alt)"
 				class="absolute bottom-0 max-w-full max-h-[250px] z-3 sm:max-md:max-h-[120px] md:top-0 md:max-h-[200px] transition-opacity ease-in duration-750"
 				:class="opacityA"
 			/>
 			<img
-				v-if="imageB"
-				:src="imageB.src"
-				:alt="$t(imageB.alt)"
+				v-if="sourceB"
+				:src="sourceB.src"
+				:alt="$t(sourceB.alt)"
 				class="absolute bottom-0 max-w-full max-h-[250px] z-3 sm:max-md:max-h-[120px] md:top-0 md:max-h-[200px] transition-opacity ease-in duration-750"
 				:class="opacityB"
 			/>

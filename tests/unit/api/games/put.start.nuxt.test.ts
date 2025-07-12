@@ -1,29 +1,19 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-	GameIdNotFoundErrorResponse,
-	InvalidActionErrorResponse,
-	NotEnoughPlayersErrorResponse,
-	UnauthorisedErrorResponse,
-	UnexpectedErrorResponse,
-} from '@/types/constants';
+import { NotEnoughPlayersErrorResponse, UnauthorisedErrorResponse } from '@/types/constants';
 import { Role } from '@/types/enums';
 
-import {
-	stubMayor,
-	stubGameReady,
-	stubErrorCode,
-	stubGameIdNotFound,
-	stubGameNew,
-	stubGameIdUpdateError,
-	stubGameInactive,
-	stubVillager1,
-	stubGameUpdateFailure,
-} from '@tests/common/stubs';
-import { mockResponseStatus } from '@tests/unit/setup/api';
-import { mockDynamoResponse, setupDynamoWrapperForEvent } from '@tests/unit/setup/dynamodb';
+import { stubMayor, stubGameReady, stubGameInactive, stubVillager1 } from '@tests/common/stubs';
+import { mockResponseStatus, runCommonApiFailureTests } from '@tests/unit/setup/api';
+import { setupDynamoWrapperForEvent } from '@tests/unit/setup/dynamodb';
 import { setMockMinPlayers, setupRuntimeConfigForApis } from '@tests/unit/setup/runtime';
 import { mockWSSend } from '@tests/unit/setup/websocket';
+
+const mockRandomInt = vi.fn().mockImplementation(() => 0);
+vi.mock('crypto', () => ({
+	randomInt: mockRandomInt,
+	default: { randomInt: mockRandomInt },
+}));
 
 describe('Start API (PUT)', async () => {
 	const handler = await import('@/server/api/games/[id]/[action].put');
@@ -31,6 +21,10 @@ describe('Start API (PUT)', async () => {
 	const spyLog = vi.spyOn(console, 'log').mockImplementation(() => {});
 	const event = await setupDynamoWrapperForEvent();
 	expect(spyLog).toBeCalled();
+
+	const callback = (code: Undefinable<Nullable<string>>, action: boolean) => {
+		stubParameters(code, action, stubMayor.id);
+	};
 
 	const stubParameters = (
 		id: Nullable<Undefinable<string>>,
@@ -129,13 +123,13 @@ describe('Start API (PUT)', async () => {
 		stubParameters(stubGameReady.id, true, stubMayor.id);
 
 		const numbers = [
-			[0.1, 0.1, 0, 1],
-			[0.9, 0.9, 5, 0],
-			[0.3, 0.7, 1, 4],
-			[0.6, 0.4, 3, 2],
+			[0, 0, 0, 1],
+			[5, 5, 5, 0],
+			[1, 4, 1, 4],
+			[3, 2, 3, 2],
 		];
 		for (const n of numbers) {
-			vi.spyOn(Math, 'random').mockReturnValueOnce(n[0]).mockReturnValueOnce(n[1]);
+			mockRandomInt.mockReturnValueOnce(n[0]).mockReturnValueOnce(n[1]);
 			const response = (await handler.default(event)) as Game;
 			expect(mockResponseStatus).toBeCalledWith(event, 200);
 			expectAllocation(response);
@@ -162,92 +156,5 @@ describe('Start API (PUT)', async () => {
 		expect(mockResponseStatus).toBeCalledWith(event, 400);
 	});
 
-	it('should return an ErrorResponse (with validation messages) if the code is invalid', async () => {
-		const codes = [
-			null,
-			undefined,
-			'',
-			'ABC',
-			'ABCDE',
-			'AB-C',
-			'A BC',
-			'AB<1',
-			"AB'1",
-			'AB,1',
-			'AB;1',
-		];
-		const errors = [
-			'code-required',
-			'code-required',
-			'code-required',
-			'code-no-spaces',
-			'code-max',
-			'code-invalid',
-			'code-no-spaces',
-			'code-invalid',
-			'code-invalid',
-			'code-invalid',
-			'code-invalid',
-		];
-		for (let c = 0; c < codes.length; c++) {
-			stubParameters(codes[c], true, stubMayor.id);
-
-			const error = structuredClone(stubErrorCode);
-			error.errors[0].message = errors[c];
-			const response = await handler.default(event);
-
-			expect(response).not.toBeNull();
-			expect((response as APIErrorResponse).errors).toEqual(
-				expect.arrayContaining(error.errors)
-			);
-			expect(mockResponseStatus).toBeCalledWith(event, 400);
-		}
-	});
-
-	it('should return a 404 if the code is not found', async () => {
-		stubParameters(stubGameIdNotFound, true, stubMayor.id);
-
-		const response = await handler.default(event);
-
-		expect(response).not.toBeNull();
-		expect(response).toEqual(GameIdNotFoundErrorResponse);
-		expect(mockResponseStatus).toBeCalledWith(event, 404);
-	});
-
-	it('should return an ErrorResponse if no action is supplied', async () => {
-		stubParameters(stubGameNew.id, false, stubMayor.id);
-
-		const response = await handler.default(event);
-
-		expect(response).not.toBeNull();
-		expect(response).toEqual(InvalidActionErrorResponse);
-		expect(mockResponseStatus).toBeCalledWith(event, 400);
-	});
-
-	it('should return an ErrorResponse (with unexpected error) if DynamoDB fails', async () => {
-		const game = structuredClone(stubGameUpdateFailure);
-		mockDynamoResponse(game);
-		stubParameters(stubGameIdUpdateError, true, stubMayor.id);
-		const spyError = vi.spyOn(console, 'error').mockImplementation(() => null);
-
-		const response = await handler.default(event);
-
-		expect(response).toEqual(UnexpectedErrorResponse);
-		expect(mockResponseStatus).toBeCalledWith(event, 500);
-		expect(spyError).toBeCalled();
-	});
-
-	it('should return an ErrorResponse (with unexpected error) if something other than DynamoDB fails', async () => {
-		const game = structuredClone(stubGameNew);
-		mockDynamoResponse(game);
-		// @ts-expect-error Type '{ id: string; }' is not assignable to type 'string'.
-		stubParameters({ id: 'Invalid' }, true, stubMayor.id);
-		const spyError = vi.spyOn(console, 'error').mockImplementation(() => null);
-
-		const response = await handler.default(event);
-		expect(response).not.toBeNull();
-		expect(response).toEqual(UnexpectedErrorResponse);
-		expect(mockResponseStatus).toBeCalledWith(event, 500);
-		expect(spyError).toBeCalled();
-	});
+	runCommonApiFailureTests('start', handler, event, callback);
 });

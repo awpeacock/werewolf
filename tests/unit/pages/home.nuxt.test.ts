@@ -246,7 +246,7 @@ describe('Home page', () => {
 				},
 			});
 
-			const create = wrapper.findAll('button').at(0);
+			const create = wrapper.findAll('a').at(0);
 			create!.trigger('click');
 			await nextTick();
 			await flushPromises();
@@ -283,7 +283,7 @@ describe('Home page', () => {
 				},
 			});
 
-			const create = wrapper.findAll('button').at(0);
+			const create = wrapper.findAll('a').at(0);
 			create!.trigger('click');
 			await nextTick();
 			await flushPromises();
@@ -320,7 +320,7 @@ describe('Home page', () => {
 				},
 			});
 
-			const join = wrapper.findAll('button').at(1);
+			const join = wrapper.findAll('a').at(1);
 			join!.trigger('click');
 			await nextTick();
 			await flushPromises();

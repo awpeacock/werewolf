@@ -155,6 +155,15 @@ describe('usePusherClient', async () => {
 		expect(socket.requests.value[1].player.nickname).toBe(stubVillager4.nickname);
 	});
 
+	it('should ignore attempts to remove messages other than join requests from the queue', async () => {
+		const game = structuredClone(stubGameNew);
+		await triggerConnect(game, stubMayor);
+
+		expect(() => {
+			socket.remove('invite-accept', stubVillager3);
+		}).not.toThrow();
+	});
+
 	it('should handle disconnecting from Pusher', async () => {
 		const game = structuredClone(stubGameNew);
 		await triggerConnect(game, stubMayor);

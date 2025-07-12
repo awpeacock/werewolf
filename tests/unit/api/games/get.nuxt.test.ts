@@ -60,8 +60,8 @@ describe('Games API (GET)', async () => {
 		const codes = [undefined, 'AB1', 'AB1CD', 'AB-1', 'AB<1', "AB'1", 'AB,1', 'AB;1'];
 
 		const handler = await import('@/server/api/games/[id]/index.get');
-		for (let c = 0; c < codes.length; c++) {
-			vi.stubGlobal('getRouterParam', vi.fn().mockReturnValue(codes[c]));
+		for (const code of codes) {
+			vi.stubGlobal('getRouterParam', vi.fn().mockReturnValue(code));
 
 			const response = await handler.default(event);
 

@@ -30,8 +30,8 @@ describe('GET /api/games/:code', () => {
 
 	it('should return an ErrorResponse if the code is not valid', async () => {
 		const codes = [undefined, 'AB1', 'AB1CD', 'AB-1', 'AB<1', "AB'1", 'AB,1', 'AB;1'];
-		for (let c = 0; c < codes.length; c++) {
-			const response = await fetch(`/api/games/${codes[c]}/`);
+		for (const code of codes) {
+			const response = await fetch(`/api/games/${code}/`);
 			expect(response.status).toBe(400);
 			const error: APIErrorResponse = await response.json();
 			expect(error).toEqual(InvalidGameIdErrorResponse);

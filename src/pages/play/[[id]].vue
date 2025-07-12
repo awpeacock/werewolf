@@ -11,6 +11,11 @@ definePageMeta({
 });
 
 type PlayState = 'initial' | 'selection' | 'day' | 'night' | 'eviction' | 'completion' | 'invalid';
+interface EventHandlerResponse {
+	sync?: boolean;
+	update?: boolean;
+	state?: Nullable<PlayState>;
+}
 
 const min = ref(6);
 
@@ -124,31 +129,7 @@ onMounted(async () => {
 	// the code in the URL must match up to that in the session,
 	// and the player must be in the game
 	await refresh();
-	if (code.value === undefined || code.value === '') {
-		state.value = 'invalid';
-		error.value = 'you-must-come-here-with-a-valid-game-code';
-	} else {
-		if (code.value !== game.id) {
-			state.value = 'invalid';
-			error.value = 'you-have-the-wrong-game-code';
-		} else if (!player || player.id === '') {
-			state.value = 'invalid';
-			error.value = 'you-have-not-yet-joined';
-		}
-	}
-	// Check whether the player in session is part of the game if not already
-	// invalidated - if already invalidated, use the error already supplied
-	if (state.value !== 'invalid') {
-		if (game.hasPlayer(player.id)) {
-			if (!game.isPlayerAdmitted(player.id)) {
-				state.value = 'invalid';
-				error.value = 'the-mayor-has-not-selected-you-to-play-in-this-game';
-			}
-		} else {
-			state.value = 'invalid';
-			error.value = 'you-are-not-a-player-in-this-game';
-		}
-	}
+	validate(player);
 	// If not invalidated, check the default state
 	if (state.value !== 'invalid') {
 		// If the game is active, always show the screen telling them who they are in case they
@@ -167,6 +148,33 @@ onMounted(async () => {
 		}
 	}
 });
+
+watch(
+	() => socket.latest.value,
+	(event) => {
+		if (event) {
+			let response: EventHandlerResponse = {};
+			if (event.type === 'start-game') {
+				response = handleStartGameEvent(event);
+			} else if (event.type === 'morning') {
+				response = handleMorningEvent();
+			} else if (event.type === 'eviction') {
+				response = handleEvictionEvent();
+			} else if (event.type === 'game-over') {
+				response = handleGameOverEvent();
+			}
+			if (response.sync) {
+				game.set(event.game);
+			}
+			if (response.update) {
+				update();
+			}
+			if (response.state) {
+				state.value = response.state;
+			}
+		}
+	}
+);
 
 // Start the game
 const start = async (event: MouseEvent) => {
@@ -291,6 +299,33 @@ const refresh = async () => {
 		useLogger().error('Could not retrieve latest game state', e as Error);
 	}
 };
+// Check the state of the game and player, and invalidate if necessary
+const validate = (player: Player) => {
+	if (code.value === undefined || code.value === '') {
+		state.value = 'invalid';
+		error.value = 'you-must-come-here-with-a-valid-game-code';
+	} else if (code.value !== game.id) {
+		state.value = 'invalid';
+		error.value = 'you-have-the-wrong-game-code';
+	} else if (!player || player.id === '') {
+		state.value = 'invalid';
+		error.value = 'you-have-not-yet-joined';
+	}
+
+	// Check whether the player in session is part of the game if not already
+	// invalidated - if already invalidated, use the error already supplied
+	if (state.value !== 'invalid') {
+		if (game.hasPlayer(player.id)) {
+			if (!game.isPlayerAdmitted(player.id)) {
+				state.value = 'invalid';
+				error.value = 'the-mayor-has-not-selected-you-to-play-in-this-game';
+			}
+		} else {
+			state.value = 'invalid';
+			error.value = 'you-are-not-a-player-in-this-game';
+		}
+	}
+};
 // Always make sure we have the correct values in place to display
 const update = () => {
 	const current: Undefinable<Activity> = game.activities?.at(-1);
@@ -302,85 +337,62 @@ const update = () => {
 			// fine as, if we were actually at night time and either the wolf or healer had chosen
 			// we would not have a complete activity as our most recent - so nobody is missing
 			// anything or out of sync.
-			if (current.evicted) {
-				evicted.value = game.findPlayer(current.evicted);
-			} else {
-				evicted.value = null;
-			}
-			state.value = 'eviction';
-		} else {
+			updateDay(current);
+		} else if (current.wolf) {
 			// However, if it is not complete, then we need to determine if the wolf and healer
 			// have both chosen so we know whether to show daytime or nighttime (and whether we
 			// have a victim)
-			if (current.wolf) {
-				const healer = game.healer!;
-				if (
-					current.healer ||
-					util.isPlayerDead(healer.id) ||
-					util.isPlayerEvicted(healer.id)
-				) {
-					if (current.wolf !== current.healer) {
-						victim.value = game.findPlayer(current.wolf);
-					} else {
-						victim.value = null;
-					}
-					if (state.value !== 'eviction') {
-						state.value = 'day';
-					}
-				} else {
-					state.value = 'night';
-				}
-			} else {
-				state.value = 'night';
-			}
+			updateNight(current);
+		} else {
+			state.value = 'night';
 		}
 	} else {
 		state.value = 'night';
 	}
 };
-
-watch(
-	() => socket.latest.value,
-	(event) => {
-		if (event) {
-			let doSync = false,
-				doUpdate = false;
-			let newState: Nullable<PlayState> = null;
-			if (event.type === 'start-game') {
-				const start = event as StartGameEvent;
-				player.addRole(start.role);
-				newState = 'selection';
-			}
-			if (event.type === 'morning') {
-				doSync = true;
-				doUpdate = true;
-				// If a villager clicks continue after the wolf and healer have
-				// chosen, they will be pushed through to the night screen unless
-				// we ensure that is overridden
-				if (!isWolf.value && !isHealer.value) {
-					override.value = true;
-				}
-			}
-			if (event.type === 'eviction') {
-				newState = 'eviction';
-				doSync = true;
-				doUpdate = true;
-			} else if (event.type === 'game-over') {
-				newState = 'completion';
-				doSync = true;
-			}
-			if (doSync) {
-				game.set(event.game);
-			}
-			if (doUpdate) {
-				update();
-			}
-			if (newState) {
-				state.value = newState;
-			}
+const updateNight = (activity: Activity): void => {
+	const healer = game.healer!;
+	if (activity.healer || util.isPlayerDead(healer.id) || util.isPlayerEvicted(healer.id)) {
+		if (activity.wolf !== activity.healer) {
+			victim.value = game.findPlayer(activity.wolf!);
+		} else {
+			victim.value = null;
 		}
+		if (state.value !== 'eviction') {
+			state.value = 'day';
+		}
+	} else {
+		state.value = 'night';
 	}
-);
+};
+const updateDay = (activity: Activity): void => {
+	if (activity.evicted) {
+		evicted.value = game.findPlayer(activity.evicted);
+	} else {
+		evicted.value = null;
+	}
+	state.value = 'eviction';
+};
+// Handlers for each incoming event
+const handleStartGameEvent = (event: StartGameEvent): EventHandlerResponse => {
+	player.addRole(event.role);
+	return { state: 'selection' };
+};
+const handleMorningEvent = (): EventHandlerResponse => {
+	// If a villager clicks continue after the wolf and healer have
+	// chosen, they will be pushed through to the night screen unless
+	// we ensure that is overridden
+	if (!isWolf.value && !isHealer.value) {
+		override.value = true;
+	}
+	return { sync: true, update: true };
+};
+const handleEvictionEvent = (): EventHandlerResponse => {
+	return { sync: true, update: true, state: 'eviction' };
+};
+const handleGameOverEvent = (): EventHandlerResponse => {
+	return { sync: true, state: 'completion' };
+};
 </script>
 
 <template>
@@ -403,6 +415,11 @@ watch(
 			<BodyText>{{ $t('story-introduction-4') }}</BodyText>
 			<BodyText>{{ $t('story-introduction-5') }}</BodyText>
 			<BodyText v-if="isMayor">{{ $t('must-have-min-players', { min: min }) }}</BodyText>
+			<BodyText
+				><NuxtLink to="/instructions" class="font-oswald text-yellow-200">{{
+					$t('link-to-instructions')
+				}}</NuxtLink></BodyText
+			>
 			<Population v-if="isMayor" :alive="alive" :dead="dead" :evicted="evictees" />
 			<Button
 				v-if="isMayor"

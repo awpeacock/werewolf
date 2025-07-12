@@ -1,3 +1,5 @@
+import type { Page } from '@playwright/test';
+
 import { GameIdNotFoundErrorResponse, UnexpectedErrorResponse } from '@/types/constants';
 
 import {
@@ -16,25 +18,36 @@ import {
 import { mockApi } from '@tests/e2e/setup/api';
 import { expect } from '@tests/e2e/setup/expect';
 import { simulate } from '@tests/e2e/setup/simulate';
+import type { Simulation } from '@tests/e2e/setup/simulate';
 import { test } from '@tests/e2e/setup/test';
+import { setup, expectNight } from '@tests/e2e/play.common';
 
 test.describe('Play games (Night)', () => {
+	const fail = async (
+		simulation: Simulation,
+		page: Page,
+		game: Game,
+		code: number,
+		response: APIErrorResponse,
+		message: string
+	) => {
+		await mockApi(page, `/api/games/${game.id}/night`, code, JSON.stringify(response), true);
+		await simulation.choose({
+			session: page,
+			parameters: {
+				target: stubVillager6.nickname,
+			},
+			result: { success: false },
+		});
+		await expect(page).toBeNight();
+		await expect(page).toHaveError(message);
+	};
+
 	test.each(['en', 'de'])(
 		'Handle the wolf returning to the game where neither has chosen',
 		async ({ locale, page }) => {
-			const simulation = await simulate(page, locale, '/');
-			const game = structuredClone(stubGameActive);
-			await simulation.inject(game, stubWolf);
-			await page.reload();
-			await mockApi(page, `/api/games/${game.id}/`, 200, JSON.stringify(game), true);
-			await simulation.go(`/play/${game.id}/`, {
-				navigate: true,
-				parameters: { button: 'resume-game' },
-			});
-			await expect(page).toBePlayPage(game.id);
-			await expect(page).toBeRolePage();
-			await simulation.progress(false, { session: page });
-			await expect(page).toBeMakingDecision();
+			const [simulation, game] = await setup(page, locale, stubGameActive, stubWolf);
+			await expectNight(page, 'deciding', false);
 			game.activities = [{ wolf: stubHealer.id, healer: null, votes: {} }];
 			await mockApi(page, `/api/games/${game.id}/night`, 200, JSON.stringify(game), true);
 			await simulation.choose({ session: page, parameters: { target: stubHealer.nickname } });
@@ -45,43 +58,16 @@ test.describe('Play games (Night)', () => {
 	test.each(['en', 'de'])(
 		'Handle the wolf returning to the game having already chosen',
 		async ({ locale, page }) => {
-			const simulation = await simulate(page, locale, '/');
-			await simulation.inject(stubGameWolfOnly, stubWolf);
-			await page.reload();
-			await mockApi(
-				page,
-				`/api/games/${stubGameWolfOnly.id}/`,
-				200,
-				JSON.stringify(stubGameWolfOnly),
-				true
-			);
-			await simulation.go(`/play/${stubGameWolfOnly.id}/`, {
-				navigate: true,
-				parameters: { button: 'resume-game' },
-			});
-			await expect(page).toBePlayPage(stubGameWolfOnly.id);
-			await expect(page).toBeRolePage();
-			await simulation.progress(false, { session: page });
-			await expect(page).toHaveMadeDecision();
+			await setup(page, locale, stubGameWolfOnly, stubWolf);
+			await expectNight(page, 'decided', false);
 		}
 	);
 
 	test.each(['en', 'de'])(
 		'Handle the wolf returning to the game where the healer has chosen',
 		async ({ locale, page }) => {
-			const simulation = await simulate(page, locale, '/');
-			const game = structuredClone(stubGameHealerOnly);
-			await simulation.inject(game, stubWolf);
-			await page.reload();
-			await mockApi(page, `/api/games/${game.id}/`, 200, JSON.stringify(game), true);
-			await simulation.go(`/play/${game.id}/`, {
-				navigate: true,
-				parameters: { button: 'resume-game' },
-			});
-			await expect(page).toBePlayPage(game.id);
-			await expect(page).toBeRolePage();
-			await simulation.progress(false, { session: page });
-			await expect(page).toBeMakingDecision();
+			const [simulation, game] = await setup(page, locale, stubGameHealerOnly, stubWolf);
+			await expectNight(page, 'deciding', false);
 			game.stage = 'day';
 			game.activities!.at(-1)!.wolf = stubHealer.id;
 			await mockApi(page, `/api/games/${game.id}/night`, 200, JSON.stringify(game), true);
@@ -94,19 +80,8 @@ test.describe('Play games (Night)', () => {
 	test.each(['en', 'de'])(
 		'Handle the healer returning to the game where neither has chosen',
 		async ({ locale, page }) => {
-			const simulation = await simulate(page, locale, '/');
-			const game = structuredClone(stubGameActive);
-			await simulation.inject(game, stubHealer);
-			await page.reload();
-			await mockApi(page, `/api/games/${game.id}/`, 200, JSON.stringify(game), true);
-			await simulation.go(`/play/${game.id}/`, {
-				navigate: true,
-				parameters: { button: 'resume-game' },
-			});
-			await expect(page).toBePlayPage(game.id);
-			await expect(page).toBeRolePage();
-			await simulation.progress(false, { session: page });
-			await expect(page).toBeMakingDecision();
+			const [simulation, game] = await setup(page, locale, stubGameActive, stubHealer);
+			await expectNight(page, 'deciding', false);
 			game.activities = [{ wolf: null, healer: stubWolf.id, votes: {} }];
 			await mockApi(page, `/api/games/${game.id}/night`, 200, JSON.stringify(game), true);
 			await simulation.choose({ session: page, parameters: { target: stubWolf.nickname } });
@@ -117,43 +92,16 @@ test.describe('Play games (Night)', () => {
 	test.each(['en', 'de'])(
 		'Handle a healer returning to the game having already chosen',
 		async ({ locale, page }) => {
-			const simulation = await simulate(page, locale, '/');
-			await simulation.inject(stubGameHealerOnly, stubHealer);
-			await page.reload();
-			await mockApi(
-				page,
-				`/api/games/${stubGameHealerOnly.id}/`,
-				200,
-				JSON.stringify(stubGameHealerOnly),
-				true
-			);
-			await simulation.go(`/play/${stubGameHealerOnly.id}/`, {
-				navigate: true,
-				parameters: { button: 'resume-game' },
-			});
-			await expect(page).toBePlayPage(stubGameHealerOnly.id);
-			await expect(page).toBeRolePage();
-			await simulation.progress(false, { session: page });
-			await expect(page).toHaveMadeDecision();
+			await setup(page, locale, stubGameHealerOnly, stubHealer);
+			await expectNight(page, 'deciding', true);
 		}
 	);
 
 	test.each(['en', 'de'])(
 		'Handle the healer returning to the game where the wolf has chosen',
 		async ({ locale, page }) => {
-			const simulation = await simulate(page, locale, '/');
-			const game = structuredClone(stubGameWolfOnly);
-			await simulation.inject(game, stubHealer);
-			await page.reload();
-			await mockApi(page, `/api/games/${game.id}/`, 200, JSON.stringify(game), true);
-			await simulation.go(`/play/${game.id}/`, {
-				navigate: true,
-				parameters: { button: 'resume-game' },
-			});
-			await expect(page).toBePlayPage(game.id);
-			await expect(page).toBeRolePage();
-			await simulation.progress(false, { session: page });
-			await expect(page).toBeMakingDecision();
+			const [simulation, game] = await setup(page, locale, stubGameWolfOnly, stubHealer);
+			await expectNight(page, 'deciding', false);
 			game.stage = 'day';
 			game.activities!.at(-1)!.healer = stubVillager6.id;
 			await mockApi(page, `/api/games/${game.id}/night`, 200, JSON.stringify(game), true);
@@ -169,33 +117,19 @@ test.describe('Play games (Night)', () => {
 	test.each(['en', 'de'])(
 		'Handle the healer returning to the game when dead',
 		async ({ locale, page }) => {
-			const simulation = await simulate(page, locale, '/');
-			const game = structuredClone(stubGameDeadHealer);
-			const votes = game.activities!.at(-1)!.votes!;
+			const original = structuredClone(stubGameDeadHealer);
+			const votes = original.activities!.at(-1)!.votes!;
 			votes[stubVillager6.id] = stubWolf.id;
-			await simulation.inject(game, stubHealer);
-			await page.reload();
-			await mockApi(page, `/api/games/${game.id}/`, 200, JSON.stringify(game), true);
-
-			await simulation.go(`/play/${game.id}/`, {
-				navigate: true,
-				parameters: { button: 'resume-game' },
-			});
-			await expect(page).toBePlayPage(game.id);
-			await expect(page).toBeRolePage();
-			await simulation.progress(false, { session: page });
+			const [simulation] = await setup(page, locale, original, stubHealer);
 			await expect(page).toHaveEvicted();
 			await simulation.progress(false, { session: page });
-
-			await expect(page).toBeNight();
-			await expect(page).not.toBeMakingDecision();
+			await expectNight(page, 'deciding', true);
 		}
 	);
 
 	test.each(['en', 'de'])(
 		'Handle the healer returning to the game when evicted',
 		async ({ locale, page }) => {
-			const simulation = await simulate(page, locale, '/');
 			const game = structuredClone(stubGameActive);
 			const activity: Activity = {
 				wolf: stubVillager6.id,
@@ -210,97 +144,34 @@ test.describe('Play games (Night)', () => {
 			activity.votes![stubVillager7.id] = stubHealer.id;
 			activity.votes![stubVillager8.id] = stubHealer.id;
 			game.activities = [activity];
-			await simulation.inject(game, stubHealer);
-			await page.reload();
-			await mockApi(page, `/api/games/${game.id}/`, 200, JSON.stringify(game), true);
-
-			await simulation.go(`/play/${game.id}/`, {
-				navigate: true,
-				parameters: { button: 'resume-game' },
-			});
-			await expect(page).toBePlayPage(game.id);
-			await expect(page).toBeRolePage();
-			await simulation.progress(false, { session: page });
+			const [simulation] = await setup(page, locale, game, stubHealer);
 			await expect(page).toHaveBeenEvicted();
 			await simulation.progress(false, { session: page });
-
-			await expect(page).toBeNight();
-			await expect(page).not.toBeMakingDecision();
+			await expectNight(page, 'deciding', true);
 		}
 	);
 
 	test.each(['en', 'de'])(
 		'Handle a villager returning to the game where the wolf has to choose',
 		async ({ locale, page }) => {
-			const simulation = await simulate(page, locale, '/');
-			await simulation.inject(stubGameHealerOnly, stubVillager6);
-			await page.reload();
-			await mockApi(
-				page,
-				`/api/games/${stubGameHealerOnly.id}/`,
-				200,
-				JSON.stringify(stubGameHealerOnly),
-				true
-			);
-			await simulation.go(`/play/${stubGameHealerOnly.id}/`, {
-				navigate: true,
-				parameters: { button: 'resume-game' },
-			});
-			await expect(page).toBePlayPage(stubGameHealerOnly.id);
-			await expect(page).toBeRolePage();
-			await simulation.progress(false, { session: page });
-			await expect(page).toBeNight();
-			await expect(page).not.toBeMakingDecision();
+			await setup(page, locale, stubGameHealerOnly, stubVillager6);
+			await expectNight(page, 'deciding', true);
 		}
 	);
 
 	test.each(['en', 'de'])(
 		'Handle a villager returning to the game where the healer has to choose',
 		async ({ locale, page }) => {
-			const simulation = await simulate(page, locale, '/');
-			await simulation.inject(stubGameWolfOnly, stubVillager6);
-			await page.reload();
-			await mockApi(
-				page,
-				`/api/games/${stubGameWolfOnly.id}/`,
-				200,
-				JSON.stringify(stubGameWolfOnly),
-				true
-			);
-			await simulation.go(`/play/${stubGameWolfOnly.id}/`, {
-				navigate: true,
-				parameters: { button: 'resume-game' },
-			});
-			await expect(page).toBePlayPage(stubGameWolfOnly.id);
-			await expect(page).toBeRolePage();
-			await simulation.progress(false, { session: page });
-			await expect(page).toBeNight();
-			await expect(page).not.toBeMakingDecision();
+			await setup(page, locale, stubGameWolfOnly, stubVillager6);
+			await expectNight(page, 'deciding', true);
 		}
 	);
 
 	test.each(['en', 'de'])(
 		'Handle a villager returning to the game where both the wolf and healer have to choose',
 		async ({ locale, page }) => {
-			const simulation = await simulate(page, locale, '/');
-			await simulation.inject(stubGameActive, stubVillager6);
-			await page.reload();
-			await mockApi(
-				page,
-				`/api/games/${stubGameActive.id}/`,
-				200,
-				JSON.stringify(stubGameActive),
-				true
-			);
-			await simulation.go(`/play/${stubGameActive.id}/`, {
-				navigate: true,
-				parameters: { button: 'resume-game' },
-			});
-			await expect(page).toBePlayPage(stubGameActive.id);
-			await expect(page).toBeRolePage();
-			await simulation.progress(false, { session: page });
-			await expect(page).toBeNight();
-			await expect(page).not.toBeMakingDecision();
+			await setup(page, locale, stubGameActive, stubVillager6);
+			await expectNight(page, 'deciding', true);
 		}
 	);
 
@@ -337,53 +208,39 @@ test.describe('Play games (Night)', () => {
 		}
 	);
 
-	test.each(['en', 'de'])('Handle a 404 error trying to vote', async ({ locale, page }) => {
-		const simulation = await simulate(page, locale, '/');
-		const game = structuredClone(stubGameIncorrectVotes1);
-		await simulation.inject(game, stubVillager6);
-		await mockApi(page, `/api/games/${game.id}/`, 200, JSON.stringify(game), true);
-		await simulation.go(`/play/${game.id}`);
-		await simulation.rejoin();
+	test.each(['en', 'de'])(
+		'Handle a 404 error trying to choose a victim',
+		async ({ locale, page }) => {
+			const [simulation, game] = await setup(page, locale, stubGameActive, stubWolf);
+			await expectNight(page, 'deciding', false);
+			await fail(simulation, page, game, 404, GameIdNotFoundErrorResponse, 'game-not-found');
+		}
+	);
 
-		await expect(page).toBeDay();
-		await mockApi(
-			page,
-			`/api/games/${game.id}/day`,
-			404,
-			JSON.stringify(GameIdNotFoundErrorResponse),
-			true
-		);
-		await simulation.vote({
-			session: page,
-			parameters: { target: stubWolf.nickname },
-			result: { success: false },
-		});
-		await expect(page).toBeDay();
-		await expect(page).toHaveError('game-not-found');
-	});
+	test.each(['en', 'de'])(
+		'Handle a 404 error trying to save a player',
+		async ({ locale, page }) => {
+			const [simulation, game] = await setup(page, locale, stubGameActive, stubHealer);
+			await expectNight(page, 'deciding', false);
+			await fail(simulation, page, game, 404, GameIdNotFoundErrorResponse, 'game-not-found');
+		}
+	);
 
-	test.each(['en', 'de'])('Handle a 500 error trying to vote', async ({ locale, page }) => {
-		const simulation = await simulate(page, locale, '/');
-		const game = structuredClone(stubGameIncorrectVotes1);
-		await simulation.inject(game, stubVillager6);
-		await mockApi(page, `/api/games/${game.id}/`, 200, JSON.stringify(game), true);
-		await simulation.go(`/play/${game.id}`);
-		await simulation.rejoin();
+	test.each(['en', 'de'])(
+		'Handle a 500 error trying to choose a victim',
+		async ({ locale, page }) => {
+			const [simulation, game] = await setup(page, locale, stubGameActive, stubWolf);
+			await expectNight(page, 'deciding', false);
+			await fail(simulation, page, game, 500, UnexpectedErrorResponse, 'unexpected-error');
+		}
+	);
 
-		await expect(page).toBeDay();
-		await mockApi(
-			page,
-			`/api/games/${game.id}/day`,
-			500,
-			JSON.stringify(UnexpectedErrorResponse),
-			true
-		);
-		await simulation.vote({
-			session: page,
-			parameters: { target: stubWolf.nickname },
-			result: { success: false },
-		});
-		await expect(page).toBeDay();
-		await expect(page).toHaveError('unexpected-error');
-	});
+	test.each(['en', 'de'])(
+		'Handle a 500 error trying to save a player',
+		async ({ locale, page }) => {
+			const [simulation, game] = await setup(page, locale, stubGameActive, stubHealer);
+			await expectNight(page, 'deciding', false);
+			await fail(simulation, page, game, 500, UnexpectedErrorResponse, 'unexpected-error');
+		}
+	);
 });

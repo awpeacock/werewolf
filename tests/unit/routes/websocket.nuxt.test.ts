@@ -22,56 +22,41 @@ describe('Server Game route', async () => {
 		default: GameHandler;
 	};
 
+	const handle = (url: string, error?: boolean) => {
+		const spyError = vi.spyOn(console, 'error').mockImplementation(() => null);
+		const stub: WebSocketPeer = {
+			id: '1bb99196-fca2-4431-bd9a-0e1d021aeb35',
+			request: { url: url },
+			close: vi.fn(),
+		};
+
+		expect(() => {
+			gameHandler.open!(stub);
+		}).not.toThrowError('');
+		if (!error) {
+			expect(mockWSOpen).toHaveBeenCalledWith(stub, 'ABCD', 'TestPlayer');
+		} else {
+			expect(mockWSOpen).not.toHaveBeenCalled();
+			expect(spyError).toHaveBeenCalledWith(
+				expect.stringContaining('WebSocket open request without game code or player')
+			);
+		}
+	};
+
 	beforeEach(() => {
 		vi.clearAllMocks();
 	});
 
 	it('should successfully handle any request to open a WebSocket', async () => {
-		const stub: WebSocketPeer = {
-			id: '1bb99196-fca2-4431-bd9a-0e1d021aeb35',
-			request: { url: '/ws?code=ABCD&player=TestPlayer' },
-			close: vi.fn(),
-		};
-
-		gameHandler.open!(stub);
-
-		expect(mockWSOpen).toHaveBeenCalledWith(stub, 'ABCD', 'TestPlayer');
+		handle('/ws?code=ABCD&player=TestPlayer');
 	});
 
 	it('should gracefully handle if a game is not supplied', async () => {
-		const spyError = vi.spyOn(console, 'error').mockImplementation(() => null);
-		const stub: WebSocketPeer = {
-			id: '1bb99196-fca2-4431-bd9a-0e1d021aeb35',
-			request: { url: '/ws?player=TestPlayer' },
-			close: vi.fn(),
-		};
-
-		expect(() => {
-			gameHandler.open!(stub);
-		}).not.toThrowError('');
-
-		expect(mockWSOpen).not.toHaveBeenCalled();
-		expect(spyError).toHaveBeenCalledWith(
-			expect.stringContaining('WebSocket open request without game code or player')
-		);
+		handle('/ws?player=TestPlayer', true);
 	});
 
 	it('should gracefully handle if a player is not supplied', async () => {
-		const spyError = vi.spyOn(console, 'error').mockImplementation(() => null);
-		const stub: WebSocketPeer = {
-			id: '1bb99196-fca2-4431-bd9a-0e1d021aeb35',
-			request: { url: '/ws?code=ABCD' },
-			close: vi.fn(),
-		};
-
-		expect(() => {
-			gameHandler.open!(stub);
-		}).not.toThrowError('');
-
-		expect(mockWSOpen).not.toHaveBeenCalled();
-		expect(spyError).toHaveBeenCalledWith(
-			expect.stringContaining('WebSocket open request without game code or player')
-		);
+		handle('/ws?code=ABCD', true);
 	});
 
 	// Until we do more useful things with these, all we can do is test for logs

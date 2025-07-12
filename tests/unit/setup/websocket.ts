@@ -12,7 +12,8 @@ export class MockWebSocket implements WebSocket {
 	readonly CLOSING = MockWebSocket.CLOSING;
 	readonly CLOSED = MockWebSocket.CLOSED;
 
-	static instances: MockWebSocket[] = [];
+	// Needs to be mutable as it gets reset beforeEach in some tests
+	static instances: MockWebSocket[] = []; //NOSONAR
 
 	url: string;
 	readyState: number = WebSocket.OPEN;
@@ -39,7 +40,7 @@ export class MockWebSocket implements WebSocket {
 
 	close(code?: number, reason?: string): void {
 		this.readyState = WebSocket.CLOSED;
-		this.onclose?.(new CloseEvent('close', { code: code || 1000, reason: reason || '' }));
+		this.onclose?.(new CloseEvent('close', { code: code ?? 1000, reason: reason ?? '' }));
 	}
 
 	// Not implemented but required by interface

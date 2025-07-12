@@ -3,6 +3,31 @@ import { Role } from '@/types/enums';
 export const stubNameDuplicate = 'Duplicate Name';
 export const stubNameError = 'Error Name';
 
+export const stubInvalidCodes = [
+	{ code: null, error: 'code-required' },
+	{ code: undefined, error: 'code-required' },
+	{ code: '', error: 'code-required' },
+	{ code: 'ABC', error: 'code-no-spaces' },
+	{ code: 'ABCDE', error: 'code-max' },
+	{ code: 'abcd', error: 'code-invalid' },
+	{ code: 'AB-C', error: 'code-invalid' },
+	{ code: 'A BC', error: 'code-no-spaces' },
+	{ code: 'AB<1', error: 'code-invalid' },
+	{ code: "AB'1", error: 'code-invalid' },
+	{ code: 'AB,1', error: 'code-invalid' },
+	{ code: 'AB;1', error: 'code-invalid' },
+];
+
+export const stubInvalidNicknames = [
+	{ nickname: null, error: 'nickname-required' },
+	{ nickname: undefined, error: 'nickname-required' },
+	{ nickname: '', error: 'nickname-required' },
+	{ nickname: 'Jim', error: 'nickname-min' },
+	{ nickname: 'Jim James Jimmy Jameson', error: 'nickname-max' },
+	{ nickname: 'Jim-Bob', error: 'nickname-invalid' },
+	{ nickname: "Jim O'James", error: 'nickname-invalid' },
+];
+
 export const stubPlayerBlank: Player = {
 	id: '',
 	nickname: '',
@@ -15,42 +40,42 @@ export const stubMayor: Player = {
 };
 export const stubVillager1: Player = {
 	id: 'e693e18c-f4a0-4012-8127-09db32207ab9',
-	nickname: 'Test Villager 1',
+	nickname: 'Test Player 1',
 	roles: [],
 };
 export const stubVillager2: Player = {
 	id: '29cb873f-59d9-440c-a61a-0681ab9866fb',
-	nickname: 'Test Villager 2',
+	nickname: 'Test Player 2',
 	roles: [],
 };
 export const stubVillager3: Player = {
 	id: 'accd6ea8-8910-4744-add2-8068dd9e1f53',
-	nickname: 'Test Villager 3',
+	nickname: 'Test Player 3',
 	roles: [],
 };
 export const stubVillager4: Player = {
 	id: '4125e688-2ec2-42dc-b117-2abb72033357',
-	nickname: 'Test Villager 4',
+	nickname: 'Test Player 4',
 	roles: [],
 };
 export const stubVillager5: Player = {
 	id: '8b46c9b9-f33c-425e-8b7d-75ce630a8ea8',
-	nickname: 'Test Villager 5',
+	nickname: 'Test Player 5',
 	roles: [],
 };
 export const stubVillager6: Player = {
 	id: '6ab26b51-171f-4eba-8d01-c04b2f7d846f',
-	nickname: 'Test Villager 6',
+	nickname: 'Test Player 6',
 	roles: [Role.VILLAGER],
 };
 export const stubVillager7: Player = {
 	id: 'e0aa6035-f740-4480-8acc-5ab1c1e8312f',
-	nickname: 'Test Villager 7',
+	nickname: 'Test Player 7',
 	roles: [Role.VILLAGER],
 };
 export const stubVillager8: Player = {
 	id: '4fd5fc5b-d92e-48f5-be3d-213f07c3cfa6',
-	nickname: 'Test Villager 8',
+	nickname: 'Test Player 8',
 	roles: [Role.VILLAGER],
 };
 export const stubWolf: Player = {

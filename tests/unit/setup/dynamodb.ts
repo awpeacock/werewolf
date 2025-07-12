@@ -22,6 +22,11 @@ import {
 	stubGameReady,
 } from '@tests/common/stubs';
 
+type MockCommand<TInput> = { input: TInput };
+type MockPutInput = { Item?: { Id?: string } };
+type MockUpdateInput = { Key?: { Id?: string } };
+type MockGetInput = { Key?: { Id?: string } };
+
 vi.mock('@aws-sdk/client-dynamodb', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('@aws-sdk/client-dynamodb')>();
 
@@ -61,105 +66,113 @@ export const mockDynamoResponse = (game: Game): void => {
 let countConcurrencyFailures = 0;
 
 vi.mock('@aws-sdk/lib-dynamodb', () => {
+	const put = (command: MockCommand<MockPutInput>) => {
+		if (command.input?.Item?.Id === stubGameIdPutError) {
+			return Promise.reject(new Error('Simulated "put" failure'));
+		}
+		if (command.input?.Item?.Id === stubGameIdDuplicateError) {
+			return Promise.reject(
+				new ConditionalCheckFailedException({
+					message: 'Simulated "put" failure',
+					$metadata: {} as DynamoDBServiceException['$metadata'],
+				})
+			);
+		}
+		return Promise.resolve({});
+	};
+
+	const update = (command: MockCommand<MockUpdateInput>) => {
+		if (command.input?.Key?.Id === stubGameIdUpdateError) {
+			return Promise.reject(new Error('Simulated "update" failure'));
+		}
+		if (command.input?.Key?.Id === stubGameIdConcurrentUpdateError) {
+			class ConditionalCheckFailedError extends Error {
+				override readonly name = 'ConditionalCheckFailedException';
+			}
+			return Promise.reject(
+				new ConditionalCheckFailedError('Simulated "update" concurrency failure')
+			);
+		}
+		if (command.input?.Key?.Id === stubGameIdConcurrentUpdateRetry) {
+			countConcurrencyFailures++;
+			if (countConcurrencyFailures < 2) {
+				class ConditionalCheckFailedError extends Error {
+					override readonly name = 'ConditionalCheckFailedException';
+				}
+				return Promise.reject(
+					new ConditionalCheckFailedError('Simulated "update" concurrency failure')
+				);
+			}
+		}
+		return Promise.resolve({});
+	};
+
+	const get = (command: MockCommand<MockGetInput>) => {
+		if (command.input?.Key?.Id === stubGameIdNotFound) {
+			return Promise.resolve({ Item: undefined });
+		}
+		if (command.input?.Key?.Id === stubGameIdGetError) {
+			return Promise.reject(new Error('Simulated "get" failure'));
+		}
+		let response: Game;
+		switch (command.input?.Key?.Id) {
+			case stubGameInactive.id: {
+				response = stubGameInactive;
+				break;
+			}
+			case stubGamePending.id: {
+				response = stubGamePending;
+				break;
+			}
+			case stubGameReady.id: {
+				response = stubGameReady;
+				break;
+			}
+			case stubGameDeadHealer.id: {
+				response = stubGameDeadHealer;
+				break;
+			}
+			case stubGameConcurrentFailure.id: {
+				response = stubGameConcurrentFailure;
+				break;
+			}
+			case stubGameConcurrentRetry.id: {
+				response = stubGameConcurrentRetry;
+				break;
+			}
+			default: {
+				response = stubDynamoGame;
+				break;
+			}
+		}
+		return Promise.resolve({
+			Item: {
+				Id: structuredClone(response.id),
+				Created: structuredClone(response.created),
+				Started: structuredClone(response.started),
+				Finished: structuredClone(response.finished),
+				Active: structuredClone(response.active),
+				Players: structuredClone(response.players),
+				Pending: structuredClone(response.pending),
+				Stage: structuredClone(response.stage),
+				Activities: structuredClone(response.activities),
+				Version: structuredClone(response.version),
+			},
+		});
+	};
+
 	return {
 		DynamoDBDocumentClient: {
 			from: vi.fn().mockReturnValue({
 				send: vi.fn((command) => {
 					if (command instanceof mockDynamoPut) {
-						if (command.input?.Item?.Id === stubGameIdPutError) {
-							return Promise.reject(new Error('Simulated "put" failure'));
-						}
-						if (command.input?.Item?.Id === stubGameIdDuplicateError) {
-							return Promise.reject(
-								new ConditionalCheckFailedException({
-									message: 'Simulated "put" failure',
-									$metadata: {} as DynamoDBServiceException['$metadata'],
-								})
-							);
-						}
-						return Promise.resolve({});
+						return put(command);
 					}
 					if (command instanceof mockDynamoUpdate) {
-						if (command.input?.Key?.Id === stubGameIdUpdateError) {
-							return Promise.reject(new Error('Simulated "update" failure'));
-						}
-						if (command.input?.Key?.Id === stubGameIdConcurrentUpdateError) {
-							class ConditionalCheckFailedError extends Error {
-								override readonly name = 'ConditionalCheckFailedException';
-							}
-							return Promise.reject(
-								new ConditionalCheckFailedError(
-									'Simulated "update" concurrency failure'
-								)
-							);
-						}
-						if (command.input?.Key?.Id === stubGameIdConcurrentUpdateRetry) {
-							countConcurrencyFailures++;
-							if (countConcurrencyFailures < 2) {
-								class ConditionalCheckFailedError extends Error {
-									override readonly name = 'ConditionalCheckFailedException';
-								}
-								return Promise.reject(
-									new ConditionalCheckFailedError(
-										'Simulated "update" concurrency failure'
-									)
-								);
-							}
-						}
-						return Promise.resolve({});
+						return update(command);
 					}
 					if (command instanceof mockDynamoGet) {
-						if (command.input?.Key?.Id === stubGameIdNotFound) {
-							return Promise.resolve({ Item: undefined });
-						}
-						if (command.input?.Key?.Id === stubGameIdGetError) {
-							return Promise.reject(new Error('Simulated "get" failure'));
-						}
-						let response: Game;
-						switch (command.input?.Key?.Id) {
-							case stubGameInactive.id: {
-								response = stubGameInactive;
-								break;
-							}
-							case stubGamePending.id: {
-								response = stubGamePending;
-								break;
-							}
-							case stubGameReady.id: {
-								response = stubGameReady;
-								break;
-							}
-							case stubGameDeadHealer.id: {
-								response = stubGameDeadHealer;
-								break;
-							}
-							case stubGameConcurrentFailure.id: {
-								response = stubGameConcurrentFailure;
-								break;
-							}
-							case stubGameConcurrentRetry.id: {
-								response = stubGameConcurrentRetry;
-								break;
-							}
-							default: {
-								response = stubDynamoGame;
-								break;
-							}
-						}
-						return Promise.resolve({
-							Item: {
-								Id: structuredClone(response.id),
-								Created: structuredClone(response.created),
-								Started: structuredClone(response.started),
-								Finished: structuredClone(response.finished),
-								Active: structuredClone(response.active),
-								Players: structuredClone(response.players),
-								Pending: structuredClone(response.pending),
-								Stage: structuredClone(response.stage),
-								Activities: structuredClone(response.activities),
-								Version: structuredClone(response.version),
-							},
-						});
+						return get(command);
 					}
 				}),
 			}),

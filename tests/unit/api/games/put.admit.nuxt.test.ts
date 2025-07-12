@@ -6,22 +6,15 @@ import {
 	stubGamePending,
 	stubVillager1,
 	stubGameNew,
-	stubGameIdNotFound,
-	stubGameIdUpdateError,
-	stubErrorCode,
 	stubVillager2,
-	stubGameUpdateFailure,
 } from '@tests/common/stubs';
-import { mockResponseStatus } from '@tests/unit/setup/api';
-import { mockDynamoResponse, setupDynamoWrapperForEvent } from '@tests/unit/setup/dynamodb';
+import { mockResponseStatus, runCommonApiFailureTests } from '@tests/unit/setup/api';
+import { setupDynamoWrapperForEvent } from '@tests/unit/setup/dynamodb';
 import { setupRuntimeConfigForApis } from '@tests/unit/setup/runtime';
 import {
-	GameIdNotFoundErrorResponse,
-	InvalidActionErrorResponse,
 	PlayerAlreadyAdmittedErrorResponse,
 	PlayerIdNotFoundErrorResponse,
 	UnauthorisedErrorResponse,
-	UnexpectedErrorResponse,
 } from '@/types/constants';
 import { mockWSSend } from '@tests/unit/setup/websocket';
 
@@ -31,6 +24,10 @@ describe('Admit API (PUT)', async () => {
 	const spyLog = vi.spyOn(console, 'log').mockImplementation(() => {});
 	const event = await setupDynamoWrapperForEvent();
 	expect(spyLog).toBeCalled();
+
+	const callback = (code: Undefinable<Nullable<string>>, action: boolean) => {
+		stubParameters(code, action, stubMayor.id, stubVillager1.id);
+	};
 
 	const stubParameters = (
 		id: Nullable<Undefinable<string>>,
@@ -162,93 +159,5 @@ describe('Admit API (PUT)', async () => {
 		expect(mockResponseStatus).toBeCalledWith(event, 403);
 	});
 
-	it('should return an ErrorResponse (with validation messages) if the code is invalid', async () => {
-		const codes = [
-			null,
-			undefined,
-			'',
-			'ABC',
-			'ABCDE',
-			'AB-C',
-			'A BC',
-			'AB<1',
-			"AB'1",
-			'AB,1',
-			'AB;1',
-		];
-		const errors = [
-			'code-required',
-			'code-required',
-			'code-required',
-			'code-no-spaces',
-			'code-max',
-			'code-invalid',
-			'code-no-spaces',
-			'code-invalid',
-			'code-invalid',
-			'code-invalid',
-			'code-invalid',
-		];
-		for (let c = 0; c < codes.length; c++) {
-			stubParameters(codes[c], true, stubMayor.id);
-
-			const error = structuredClone(stubErrorCode);
-			error.errors[0].message = errors[c];
-			const response = await handler.default(event);
-
-			expect(response).not.toBeNull();
-			expect((response as APIErrorResponse).errors).toEqual(
-				expect.arrayContaining(error.errors)
-			);
-			expect(mockResponseStatus).toBeCalledWith(event, 400);
-		}
-	});
-
-	it('should return a 404 if the code is not found', async () => {
-		stubParameters(stubGameIdNotFound, true, stubMayor.id, stubVillager1.id, true);
-
-		const response = await handler.default(event);
-
-		expect(response).not.toBeNull();
-		expect(response).toEqual(GameIdNotFoundErrorResponse);
-		expect(mockResponseStatus).toBeCalledWith(event, 404);
-	});
-
-	it('should return an ErrorResponse if no action is supplied', async () => {
-		stubParameters(stubGameNew.id, false, stubMayor.id, stubVillager1.id, false);
-
-		const response = await handler.default(event);
-
-		expect(response).not.toBeNull();
-		expect(response).toEqual(InvalidActionErrorResponse);
-		expect(mockResponseStatus).toBeCalledWith(event, 400);
-	});
-
-	it('should return an ErrorResponse (with unexpected error) if DynamoDB fails', async () => {
-		const game = structuredClone(stubGameUpdateFailure);
-		mockDynamoResponse(game);
-		stubParameters(stubGameIdUpdateError, true, stubMayor.id, stubVillager1.id);
-		const spyError = vi.spyOn(console, 'error').mockImplementation(() => null);
-
-		const response = await handler.default(event);
-
-		expect(response).not.toBeNull();
-		expect(response).toEqual(UnexpectedErrorResponse);
-		expect(mockResponseStatus).toBeCalledWith(event, 500);
-		expect(spyError).toBeCalled();
-	});
-
-	it('should return an ErrorResponse (with unexpected error) if something other than DynamoDB fails', async () => {
-		const game = structuredClone(stubGameNew);
-		mockDynamoResponse(game);
-		// @ts-expect-error Type '{ id: string; }' is not assignable to type 'string'.
-		stubParameters({ id: 'Invalid' }, true, stubMayor.id, stubVillager1.id);
-		const spyError = vi.spyOn(console, 'error').mockImplementation(() => null);
-
-		const response = await handler.default(event);
-		expect(response).not.toBeNull();
-		expect(response).toEqual(UnexpectedErrorResponse);
-		expect(mockResponseStatus).toBeCalledWith(event, 500);
-		expect(spyError).toBeCalled();
-	});
+	runCommonApiFailureTests('admit', handler, event, callback);
 });

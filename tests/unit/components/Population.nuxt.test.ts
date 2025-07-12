@@ -15,6 +15,48 @@ import {
 import { mockT, setLocalePath } from '@tests/unit/setup/i18n';
 
 describe('Population', async () => {
+	const test = async (
+		locale: string,
+		alive: Array<Player>,
+		dead: Array<Player>,
+		evicted: Array<Player>
+	) => {
+		setLocalePath(locale);
+		const wrapper = await mountSuspended(Population, {
+			props: {
+				alive: alive,
+				dead: dead,
+				evicted: evicted,
+			},
+			global: {
+				mocks: {
+					$t: mockT,
+				},
+			},
+		});
+
+		expect(wrapper.text()).toContain(`population (${locale}) : ${alive.length}`);
+		for (const player of alive) {
+			expect(wrapper.text()).toContain(player.nickname);
+		}
+		if (dead.length === 0) {
+			expect(wrapper.text()).not.toContain('rip');
+		} else {
+			for (const player of dead) {
+				expect(wrapper.text()).toContain(player.nickname);
+			}
+			const expression: RegExp = new RegExp('rip \\{.*?\\}  \\(' + locale + '\\)');
+			expect(wrapper.text()).toMatch(expression);
+		}
+		if (evicted.length > 0) {
+			for (const player of evicted) {
+				expect(wrapper.text()).toContain(player.nickname);
+			}
+			const expression: RegExp = new RegExp('evicted \\{.*?\\}  \\(' + locale + '\\)');
+			expect(wrapper.text()).toMatch(expression);
+		}
+	};
+
 	beforeEach(() => {
 		vi.clearAllMocks();
 	});
@@ -22,117 +64,43 @@ describe('Population', async () => {
 	it.each(['en', 'de'])(
 		'should mount successfully (with no dead and no evictees)',
 		async (locale: string) => {
-			setLocalePath(locale);
-
-			const wrapper = await mountSuspended(Population, {
-				props: {
-					alive: [stubMayor, stubVillager1],
-					dead: [],
-					evicted: [],
-				},
-				global: {
-					mocks: {
-						$t: mockT,
-					},
-				},
-			});
-
-			expect(wrapper.text()).toContain(`population (${locale}) : 2`);
-			expect(wrapper.text()).toContain(stubMayor.nickname);
-			expect(wrapper.text()).toContain(stubVillager1.nickname);
-			expect(wrapper.text()).not.toContain('rip');
+			await test(locale, [stubMayor, stubVillager1], [], []);
 		}
 	);
 
 	it.each(['en', 'de'])(
 		'should mount successfully (with dead but no evictees)',
 		async (locale: string) => {
-			setLocalePath(locale);
-
-			const wrapper = await mountSuspended(Population, {
-				props: {
-					alive: [stubMayor, stubWolf, stubVillager6, stubVillager7],
-					dead: [stubHealer, stubVillager8],
-					evicted: [],
-				},
-				global: {
-					mocks: {
-						$t: mockT,
-					},
-				},
-			});
-
-			expect(wrapper.text()).toContain(`population (${locale}) : 4`);
-			expect(wrapper.text()).toContain(stubMayor.nickname);
-			expect(wrapper.text()).toContain(stubWolf.nickname);
-			expect(wrapper.text()).toContain(stubVillager6.nickname);
-			expect(wrapper.text()).toContain(stubVillager7.nickname);
-			expect(wrapper.text()).toContain(stubHealer.nickname);
-			expect(wrapper.text()).toContain(stubVillager8.nickname);
-			const expression: RegExp = new RegExp('rip \\{.*?\\}  \\(' + locale + '\\)');
-			expect(wrapper.text()).toMatch(expression);
+			await test(
+				locale,
+				[stubMayor, stubWolf, stubVillager6, stubVillager7],
+				[stubHealer, stubVillager8],
+				[]
+			);
 		}
 	);
 
 	it.each(['en', 'de'])(
 		'should mount successfully (with evictees but no dead)',
 		async (locale: string) => {
-			setLocalePath(locale);
-
-			const wrapper = await mountSuspended(Population, {
-				props: {
-					alive: [stubMayor, stubWolf, stubVillager6, stubVillager7],
-					dead: [],
-					evicted: [stubHealer, stubVillager8],
-				},
-				global: {
-					mocks: {
-						$t: mockT,
-					},
-				},
-			});
-
-			expect(wrapper.text()).toContain(`population (${locale}) : 4`);
-			expect(wrapper.text()).toContain(stubMayor.nickname);
-			expect(wrapper.text()).toContain(stubWolf.nickname);
-			expect(wrapper.text()).toContain(stubVillager6.nickname);
-			expect(wrapper.text()).toContain(stubVillager7.nickname);
-			expect(wrapper.text()).toContain(stubHealer.nickname);
-			expect(wrapper.text()).toContain(stubVillager8.nickname);
-			const expression: RegExp = new RegExp('evicted \\{.*?\\}  \\(' + locale + '\\)');
-			expect(wrapper.text()).toMatch(expression);
+			await test(
+				locale,
+				[stubMayor, stubWolf, stubVillager6, stubVillager7],
+				[],
+				[stubHealer, stubVillager8]
+			);
 		}
 	);
 
 	it.each(['en', 'de'])(
 		'should mount successfully (with dead and evictees)',
 		async (locale: string) => {
-			setLocalePath(locale);
-
-			const wrapper = await mountSuspended(Population, {
-				props: {
-					alive: [stubWolf, stubVillager7],
-					dead: [stubMayor, stubVillager6],
-					evicted: [stubHealer, stubVillager8],
-				},
-				global: {
-					mocks: {
-						$t: mockT,
-					},
-				},
-			});
-
-			expect(wrapper.text()).toContain(`population (${locale}) : 2`);
-			expect(wrapper.text()).toContain(stubMayor.nickname);
-			expect(wrapper.text()).toContain(stubWolf.nickname);
-			expect(wrapper.text()).toContain(stubVillager6.nickname);
-			expect(wrapper.text()).toContain(stubVillager7.nickname);
-			expect(wrapper.text()).toContain(stubHealer.nickname);
-			expect(wrapper.text()).toContain(stubVillager8.nickname);
-			let expression: RegExp = new RegExp('rip \\{.*?\\}  \\(' + locale + '\\)');
-			expect(wrapper.text()).toMatch(expression);
-			expression = new RegExp('evicted \\{.*?\\}  \\(' + locale + '\\)');
-			expect(wrapper.text()).toMatch(expression);
+			await test(
+				locale,
+				[stubWolf, stubVillager7],
+				[stubMayor, stubVillager6],
+				[stubHealer, stubVillager8]
+			);
 		}
 	);
 });

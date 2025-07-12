@@ -1,7 +1,28 @@
 import { BlankActivity } from '@/types/constants';
 import { Role } from '@/types/enums';
 
-export const useGame = (game: Game) => {
+export interface GameUtility {
+	parse: () => Game;
+	getLatest: () => Promise<Game>;
+	getMayor: () => Nullable<Player>;
+	getWolf: () => Nullable<Player>;
+	getHealer: () => Nullable<Player>;
+	findPlayer: (_identifier: string) => Nullable<Player>;
+	hasPlayer: (_identifier: string) => boolean;
+	isPlayerAdmitted: (_identifier: string) => boolean;
+	isPlayerDead: (_identifier: string) => boolean;
+	getDeadPlayers: () => Array<Player>;
+	isPlayerEvicted: (_identifier: string) => boolean;
+	wasPlayerEvicted: (_identifier: string) => boolean;
+	getEvictedPlayers: () => Array<Player>;
+	getAlivePlayers: () => Array<Player>;
+	admitPlayer: (_identifier: string) => Game;
+	removePlayer: (_identifier: string) => Game;
+	getCurrentActivity: () => Activity;
+	isActivityComplete: (_activity: Activity) => boolean;
+}
+
+export const useGame = (game: Game): GameUtility => {
 	const parse = (): Game => {
 		game.created = new Date(game.created);
 		return game;
@@ -145,7 +166,7 @@ export const useGame = (game: Game) => {
 		for (const activity of game.activities) {
 			if (activity.votes) {
 				const evicted: Nullable<Player> = activity.evicted
-					? findPlayer(activity.evicted!)
+					? findPlayer(activity.evicted)
 					: null;
 				if (evicted) {
 					players.push(evicted);
@@ -207,7 +228,7 @@ export const useGame = (game: Game) => {
 	};
 
 	const isActivityComplete = (activity: Activity): boolean => {
-		if (activity!.wolf === null || activity!.wolf === undefined) {
+		if (activity.wolf === null || activity.wolf === undefined) {
 			return false;
 		}
 		// Important check - if the healer gets killed or evicted, then marking
@@ -215,14 +236,14 @@ export const useGame = (game: Game) => {
 		// return false
 		const healer = getHealer();
 		if (healer && !isPlayerEvicted(healer.id) && !isPlayerDead(healer.id)) {
-			if (activity!.healer === null || activity!.healer === undefined) {
+			if (activity.healer === null || activity.healer === undefined) {
 				return false;
 			}
 		}
-		if (activity!.votes === undefined) {
+		if (activity.votes === undefined) {
 			return false;
 		}
-		if (Object.keys(activity!.votes).length < getAlivePlayers().length) {
+		if (Object.keys(activity.votes).length < getAlivePlayers().length) {
 			return false;
 		}
 		return true;

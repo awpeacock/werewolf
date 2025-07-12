@@ -6,7 +6,7 @@ export const useEnvironment = () => {
 		// all scenarios when a client/server switch is used
 		isClient: () => {
 			try {
-				return typeof import.meta !== 'undefined' && import.meta.client;
+				return import.meta?.client;
 			} catch {
 				return false;
 			}

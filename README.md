@@ -151,6 +151,38 @@ Most scripts support the following optional flags:
 
 ## Deployment
 
+### SonarCloud (Code Quality, Coverage & Security)
+
+If you haven't already, setup an account at [SonarCloud](https://www.sonarsource.com/products/sonarcloud/).
+
+#### 1. Create a SonarCloud Project:
+
+- Visit https://sonarcloud.io/projects
+- Click + to create a new project
+- Link/Bind it to your GitHub repository.
+- _Please note, if you don't create a new project here, SonarCloud will automatically create one for you upon the first scan from the details provided below._
+
+#### 2. Generate a Sonar Token:
+
+- In SonarCloud, go to _My Account › Security_
+- Generate a new token (e.g., `github-werewolf`)
+
+#### 3. Add the Token to GitHub Secrets:
+
+- In your GitHub repo, go to _Settings › Secrets and variables › Actions › Secrets_
+- Add the following secrets:
+
+    ```
+    Name: SONAR_TOKEN
+    Value: <your generated token>
+
+    Name: SONAR_ORG
+    Value: <your organization id>
+
+    Name: SONAR_PROJECT
+    Value: <your project name>
+    ```
+
 ### Vercel Setup
 
 If you haven't already, setup an account at [Vercel](https://vercel.com/).
@@ -191,6 +223,9 @@ If you haven't already, setup an account at [Vercel](https://vercel.com/).
     | PUSHER_APP_KEY        | PUSHER_APP_ID      |
     | PUSHER_APP_SECRET     | PUSHER_CLUSTER     |
     | VERCEL_TOKEN          |                    |
+    | SONAR_TOKEN           |                    |
+    | SONAR_ORG             |                    |
+    | SONAR_PROJECT         |                    |
 
 > ⚠️ If using Vercel set `BROADCAST_PROVIDER` to `pusher`.
 

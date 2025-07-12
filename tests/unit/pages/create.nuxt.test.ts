@@ -73,7 +73,7 @@ describe('Create Game page', () => {
 		const input = wrapper.find('input');
 		await input.setValue(value);
 		await input.trigger('blur');
-		const button = wrapper.find('button');
+		const button = wrapper.find('a');
 		await button.trigger('click');
 		await flushPromises();
 
@@ -131,7 +131,7 @@ describe('Create Game page', () => {
 		const links = wrapper.findAllComponents(stubNuxtLink);
 		expect(links).not.toBeNull();
 		expect(links.length).toBe(2);
-		expect(links[1]!.props('to')).toEqual({ path: `/play/${code}`, query: {} });
+		expect(links[1].props('to')).toEqual({ path: `/play/${code}`, query: {} });
 	};
 
 	beforeEach(() => {
@@ -148,11 +148,26 @@ describe('Create Game page', () => {
 		expectStage1(wrapper, locale);
 	});
 
-	it.each(['en', 'de'])('submits the form successfully', async (locale: string) => {
-		const wrapper = await setupPage(locale, 200, stubGameNew);
-		await triggerInput(wrapper, 'TestPlayer', true, stubGameNew);
-		expectStage2(wrapper, locale, stubGameNew.id);
-	});
+	it.each(['en', 'de'])(
+		'submits the form successfully (trimming where needed)',
+		async (locale: string) => {
+			const names = [
+				'TestPlayer',
+				'Test Player',
+				'TestPlayer ',
+				' TestPlayer',
+				' TestPlayer ',
+				' Test Player ',
+			];
+			for (const name of names) {
+				sessionStorage.clear();
+				const wrapper = await setupPage(locale, 200, stubGameNew);
+				await triggerInput(wrapper, name, true, stubGameNew);
+				expectStage2(wrapper, locale, stubGameNew.id);
+				wrapper.unmount();
+			}
+		}
+	);
 
 	it.each(['en', 'de'])('will invalidate the form appropriately', async (locale: string) => {
 		const wrapper = await setupPage(locale, 400, stubErrorNickname);
@@ -197,7 +212,7 @@ describe('Create Game page', () => {
 		});
 		expectStage2(wrapper, locale, stubGameNew.id);
 
-		const button = wrapper.find('button[data-testid="invite-button"]');
+		const button = wrapper.find('a[data-testid="invite-button"]');
 		await button.trigger('click');
 		await flushPromises();
 

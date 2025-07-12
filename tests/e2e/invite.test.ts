@@ -93,6 +93,15 @@ test.describe('Invite players', () => {
 	});
 
 	test.each(['en', 'de'])('Copy link', async ({ locale, page, browser, context }) => {
+		const permission: PermissionStatus = {
+			state: 'granted',
+			onchange: null,
+			addEventListener: () => {},
+			removeEventListener: () => {},
+			dispatchEvent: () => false,
+			name: 'clipboard-write',
+		};
+
 		const isWebKit = browser.browserType().name() === 'webkit';
 		if (!isWebKit) {
 			await context.grantPermissions(['clipboard-read', 'clipboard-write']);
@@ -103,14 +112,7 @@ test.describe('Invite players', () => {
 				const originalQuery = navigator.permissions?.query;
 				navigator.permissions.query = async (desc) => {
 					if (desc.name === ('clipboard-write' as PermissionName)) {
-						return {
-							state: 'granted',
-							onchange: null,
-							addEventListener: () => {},
-							removeEventListener: () => {},
-							dispatchEvent: () => false,
-							name: 'clipboard-write',
-						};
+						return permission;
 					}
 					return originalQuery?.(desc);
 				};

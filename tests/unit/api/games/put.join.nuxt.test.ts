@@ -1,14 +1,8 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-	GameIdNotFoundErrorResponse,
-	InvalidActionErrorResponse,
-	NicknameAlreadyExistsErrorResponse,
-	UnexpectedErrorResponse,
-} from '@/types/constants';
+import { NicknameAlreadyExistsErrorResponse, UnexpectedErrorResponse } from '@/types/constants';
 
 import {
-	stubGameIdNotFound,
 	stubGameInactive,
 	stubMayor,
 	stubGameNew,
@@ -16,14 +10,12 @@ import {
 	stubGamePending,
 	stubVillager1,
 	stubVillager2,
-	stubGameIdUpdateError,
-	stubErrorCode,
-	stubGameUpdateFailure,
 	stubGameConcurrentFailure,
 	stubGameConcurrentRetry,
+	stubInvalidNicknames,
 } from '@tests/common/stubs';
-import { mockResponseStatus } from '@tests/unit/setup/api';
-import { mockDynamoResponse, setupDynamoWrapperForEvent } from '@tests/unit/setup/dynamodb';
+import { mockResponseStatus, runCommonApiFailureTests } from '@tests/unit/setup/api';
+import { setupDynamoWrapperForEvent } from '@tests/unit/setup/dynamodb';
 import { setMockRetries, setupRuntimeConfigForApis } from '@tests/unit/setup/runtime';
 import { mockWSSend } from '@tests/unit/setup/websocket';
 
@@ -33,6 +25,10 @@ describe('Join API (PUT)', async () => {
 	const spyLog = vi.spyOn(console, 'log').mockImplementation(() => {});
 	const event = await setupDynamoWrapperForEvent();
 	expect(spyLog).toBeCalled();
+
+	const callback = (code: Undefinable<Nullable<string>>, action: boolean) => {
+		stubParameters(code, action, 'Nickname');
+	};
 
 	const stubParameters = (
 		id: Nullable<Undefinable<string>>,
@@ -218,6 +214,72 @@ describe('Join API (PUT)', async () => {
 		expect(mockResponseStatus).toBeCalledWith(event, 200);
 	});
 
+	it('should trim the end of a nickname', async () => {
+		stubParameters(stubGameNew.id, true, stubVillager1.nickname + ' ');
+
+		const response = await handler.default(event);
+		const game = response as Game;
+		expectPending(game, stubGameNew, 1, 1);
+		expect(mockResponseStatus).toBeCalledWith(event, 200);
+
+		// Test that the web socket notification is published
+		expect(mockWSSend).toHaveBeenCalledWith(
+			{
+				game: game.id,
+				player: stubMayor.id,
+			},
+			{
+				type: 'join-request',
+				game: game,
+				player: game.pending![0],
+			}
+		);
+	});
+
+	it('should trim the start of a nickname', async () => {
+		stubParameters(stubGameNew.id, true, ' ' + stubVillager1.nickname);
+
+		const response = await handler.default(event);
+		const game = response as Game;
+		expectPending(game, stubGameNew, 1, 1);
+		expect(mockResponseStatus).toBeCalledWith(event, 200);
+
+		// Test that the web socket notification is published
+		expect(mockWSSend).toHaveBeenCalledWith(
+			{
+				game: game.id,
+				player: stubMayor.id,
+			},
+			{
+				type: 'join-request',
+				game: game,
+				player: game.pending![0],
+			}
+		);
+	});
+
+	it('should trim both ends of a nickname', async () => {
+		stubParameters(stubGameNew.id, true, ' ' + stubVillager1.nickname + ' ');
+
+		const response = await handler.default(event);
+		const game = response as Game;
+		expectPending(game, stubGameNew, 1, 1);
+		expect(mockResponseStatus).toBeCalledWith(event, 200);
+
+		// Test that the web socket notification is published
+		expect(mockWSSend).toHaveBeenCalledWith(
+			{
+				game: game.id,
+				player: stubMayor.id,
+			},
+			{
+				type: 'join-request',
+				game: game,
+				player: game.pending![0],
+			}
+		);
+	});
+
 	it('should retry if two requests arrive at the same time and attempt to update the DB concurrently', async () => {
 		stubParameters(stubGameConcurrentRetry.id, true, stubVillager2.nickname);
 		const spyWarn = vi.spyOn(console, 'warn').mockImplementation(() => null);
@@ -233,89 +295,18 @@ describe('Join API (PUT)', async () => {
 		}
 	});
 
-	it('should return an ErrorResponse (with validation messages) if the code is invalid', async () => {
-		const codes = [
-			null,
-			undefined,
-			'',
-			'ABC',
-			'ABCDE',
-			'AB-C',
-			'A BC',
-			'AB<1',
-			"AB'1",
-			'AB,1',
-			'AB;1',
-		];
-		const errors = [
-			'code-required',
-			'code-required',
-			'code-required',
-			'code-no-spaces',
-			'code-max',
-			'code-invalid',
-			'code-no-spaces',
-			'code-invalid',
-			'code-invalid',
-			'code-invalid',
-			'code-invalid',
-		];
-		for (let c = 0; c < codes.length; c++) {
-			stubParameters(codes[c], true, 'Nickname');
-
-			const error = structuredClone(stubErrorCode);
-			error.errors[0].message = errors[c];
-			const response = await handler.default(event);
-
-			expect(response).not.toBeNull();
-			expect((response as APIErrorResponse).errors).toEqual(
-				expect.arrayContaining(error.errors)
-			);
-			expect(mockResponseStatus).toBeCalledWith(event, 400);
-		}
-	});
-
 	it('should return an ErrorResponse (with validation messages) if the nickname is invalid', async () => {
-		const names = [null, undefined, '', 'Jim', 'Jim James Jimmy Jameson', 'Jim-Bob'];
-		const errors = [
-			'nickname-required',
-			'nickname-required',
-			'nickname-required',
-			'nickname-min',
-			'nickname-max',
-			'nickname-invalid',
-		];
-		for (let n = 0; n < names.length; n++) {
-			stubParameters(stubGameNew.id, true, names[n]);
+		for (const name of stubInvalidNicknames) {
+			stubParameters(stubGameNew.id, true, name.nickname);
 
 			const error = structuredClone(stubErrorNickname);
-			error.errors[0].message = errors[n];
+			error.errors[0].message = name.error;
 			const response = await handler.default(event);
 
 			expect(response).not.toBeNull();
 			expect(response).toEqual(error);
 			expect(mockResponseStatus).toBeCalledWith(event, 400);
 		}
-	});
-
-	it('should return a 404 if the code is not found', async () => {
-		stubParameters(stubGameIdNotFound, true, stubVillager1.nickname);
-
-		const response = await handler.default(event);
-
-		expect(response).not.toBeNull();
-		expect(response).toEqual(GameIdNotFoundErrorResponse);
-		expect(mockResponseStatus).toBeCalledWith(event, 404);
-	});
-
-	it('should return an ErrorResponse if no action is supplied', async () => {
-		stubParameters(stubGameNew.id, false, stubVillager1.nickname);
-
-		const response = await handler.default(event);
-
-		expect(response).not.toBeNull();
-		expect(response).toEqual(InvalidActionErrorResponse);
-		expect(mockResponseStatus).toBeCalledWith(event, 400);
 	});
 
 	it('should return an ErrorResponse if too many concurrent attempts are made to update DynamoDB', async () => {
@@ -336,30 +327,5 @@ describe('Join API (PUT)', async () => {
 		}
 	});
 
-	it('should return an ErrorResponse (with unexpected error) if DynamoDB fails', async () => {
-		const game = structuredClone(stubGameUpdateFailure);
-		mockDynamoResponse(game);
-		stubParameters(stubGameIdUpdateError, true, 'NewNickname');
-		const spyError = vi.spyOn(console, 'error').mockImplementation(() => null);
-
-		const response = await handler.default(event);
-		expect(response).not.toBeNull();
-		expect(response).toEqual(UnexpectedErrorResponse);
-		expect(mockResponseStatus).toBeCalledWith(event, 500);
-		expect(spyError).toBeCalled();
-	});
-
-	it('should return an ErrorResponse (with unexpected error) if something other than DynamoDB fails', async () => {
-		const game = structuredClone(stubGameNew);
-		mockDynamoResponse(game);
-		// @ts-expect-error Type '{ id: string; }' is not assignable to type 'string'.
-		stubParameters({ id: 'Invalid' }, true, 'NewNickname');
-		const spyError = vi.spyOn(console, 'error').mockImplementation(() => null);
-
-		const response = await handler.default(event);
-		expect(response).not.toBeNull();
-		expect(response).toEqual(UnexpectedErrorResponse);
-		expect(mockResponseStatus).toBeCalledWith(event, 500);
-		expect(spyError).toBeCalled();
-	});
+	runCommonApiFailureTests('join', handler, event, callback);
 });

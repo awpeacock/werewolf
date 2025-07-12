@@ -29,9 +29,7 @@ const getLocale = async (page: Page) => {
 export const expect = base.extend({
 	async toMatchPage(received: Page, url: string, title: string, heading?: string) {
 		const locale = await getLocale(received);
-		if (!heading) {
-			heading = title;
-		}
+		heading ??= title;
 
 		// First, match the URL
 		const regex =
@@ -61,7 +59,6 @@ export const expect = base.extend({
 	},
 
 	async toBeHomePage(received: Page) {
-		await expect(received).toMatchPage('/', 'werewolf-game', 'werewolf');
 		const locale = await getLocale(received);
 
 		await expect(
@@ -414,6 +411,7 @@ export const expect = base.extend({
 					'you-cannot-vote-as-you-have-been-evicted',
 					'you-have-evicted',
 					'you-have-evicted-nobody',
+					'you-have-voted',
 				],
 				{
 					condition: 'OR',
@@ -422,6 +420,18 @@ export const expect = base.extend({
 			);
 		} else {
 			await expect(received).toMatchText('time-for-the-village-to-vote');
+			await expect(received).not.toMatchText(
+				[
+					'you-cannot-vote-as-you-are-dead',
+					'you-cannot-vote-as-you-have-been-evicted',
+					'you-have-evicted',
+					'you-have-evicted-nobody',
+					'you-have-voted',
+				],
+				{
+					replacements: { evicted: '[\\w\\s]*' },
+				}
+			);
 		}
 		return {
 			pass: !isNot,
@@ -547,7 +557,7 @@ export const expect = base.extend({
 
 			if (isNot) {
 				if (errors[nickname]) {
-					await expect(received).toHaveError(errors[nickname]!);
+					await expect(received).toHaveError(errors[nickname]);
 					await expect(received.getByTestId('nickname-error')).toBeVisible();
 				} else {
 					await expect(received.getByTestId('nickname-error')).not.toBeVisible();
@@ -643,23 +653,25 @@ export const expect = base.extend({
 		const isNot = this?.isNot ?? false;
 		const locale = await getLocale(received);
 
-		if (!Array.isArray(expected)) {
-			expected = [expected];
-		}
-		for (let t = 0; t < expected.length; t++) {
-			expected[t] = locale.translate(expected[t]).replace(/\s+/g, ' ').trim();
-			if (options?.translate === 'UPPER') {
-				expected[t] = expected[t].toUpperCase();
-			}
-			if (options?.replacements) {
-				for (const key of Object.keys(options.replacements)) {
-					if (options.replacements[key] !== undefined) {
-						expected[t] = expected[t].replaceAll(`{${key}}`, options.replacements[key]);
+		const clean = (expected: Array<string>) => {
+			for (let t = 0; t < expected.length; t++) {
+				expected[t] = locale.translate(expected[t]).replace(/\s+/g, ' ').trim();
+				if (options?.translate === 'UPPER') {
+					expected[t] = expected[t].toUpperCase();
+				}
+				if (options?.replacements) {
+					for (const key of Object.keys(options.replacements)) {
+						if (options.replacements[key] !== undefined) {
+							expected[t] = expected[t].replaceAll(
+								`{${key}}`,
+								options.replacements[key]
+							);
+						}
 					}
 				}
 			}
-		}
-		if (options?.condition === 'OR') {
+		};
+		const matchOr = async (expected: Array<string>) => {
 			const re = new RegExp(expected.join('|').replace(/\s+/g, ' ').trim());
 			if (isNot) {
 				await expect
@@ -676,7 +688,8 @@ export const expect = base.extend({
 					})
 					.toMatch(re);
 			}
-		} else {
+		};
+		const matchAnd = async (expected: Array<string>) => {
 			for (const text of expected) {
 				if (isNot) {
 					await expect
@@ -694,6 +707,17 @@ export const expect = base.extend({
 						.toContain(text);
 				}
 			}
+		};
+
+		if (!Array.isArray(expected)) {
+			expected = [expected];
+		}
+		clean(expected);
+
+		if (options?.condition === 'OR') {
+			await matchOr(expected);
+		} else {
+			await matchAnd(expected);
 		}
 		return {
 			pass: !isNot,

@@ -87,16 +87,17 @@ const join = async (_event: MouseEvent) => {
 	const valid = validCode && validNickname;
 	if (valid) {
 		loading.value = true;
+		const nickname = valNickname.value.trim();
 		$fetch<Game>(
 			`/api/games/${code.value.toUpperCase()}/join` + (invite ? `?invite=${invite}` : ''),
 			{
 				method: 'PUT',
-				body: { villager: valNickname.value },
+				body: { villager: nickname },
 			}
 		)
 			.then((response: Game) => {
 				game.set(useGame(response).parse());
-				const player: Nullable<Player> = game.findPlayer(valNickname.value);
+				const player: Nullable<Player> = game.findPlayer(nickname);
 				if (player === null) {
 					errGlobal.value = 'unexpected-error';
 				} else {

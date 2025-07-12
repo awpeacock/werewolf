@@ -12,10 +12,10 @@ export default defineEventHandler(
 
 			const config = useRuntimeConfig();
 			const pusher = new Pusher({
-				appId: config.public.PUSHER_APP_ID as string,
-				key: config.public.PUSHER_APP_KEY as string,
-				secret: config.PUSHER_APP_SECRET as string,
-				cluster: config.public.PUSHER_CLUSTER as string,
+				appId: config.public.PUSHER_APP_ID,
+				key: config.public.PUSHER_APP_KEY,
+				secret: config.PUSHER_APP_SECRET,
+				cluster: config.public.PUSHER_CLUSTER,
 				useTLS: true,
 			});
 
@@ -36,7 +36,7 @@ export default defineEventHandler(
 				setResponseStatus(event, 400);
 				return 'Bad request: ' + error;
 			}
-			if (!socketId.match(/^[0-9]+\.[0-9]+$/)) {
+			if (!socketId.match(/^\d+\.\d+$/)) {
 				useLogger().error('Invalid socket ID in Pusher auth request - ' + socketId);
 
 				setResponseStatus(event, 400);
@@ -44,7 +44,7 @@ export default defineEventHandler(
 			}
 			if (
 				!channel.match(
-					/^private-game-[A-Z0-9]{4}(-player-[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}){0,1}$/
+					/^private-game-[A-Z0-9]{4}(-player-[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12})?$/
 				)
 			) {
 				useLogger().error('Invalid channel name in Pusher auth request - ' + channel);

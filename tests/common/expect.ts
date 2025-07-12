@@ -1,6 +1,6 @@
 import { expect, expectTypeOf } from 'vitest';
+import type { Mock } from 'vitest';
 
-//TODO: Retrofit to the unit tests
 expect.extend({
 	toEqualGame(received: Game, expected: Game) {
 		expectTypeOf(received).toEqualTypeOf<Game>();
@@ -19,15 +19,13 @@ expect.extend({
 			for (const activity of expected.activities) {
 				expect(received).toHaveActivity(activity);
 			}
-		} else {
-			if (received.activities) {
-				return {
-					pass: false,
-					message: () =>
-						'Game is NOT a match due to unexpected activities - ' +
-						JSON.stringify(received.activities),
-				};
-			}
+		} else if (received.activities) {
+			return {
+				pass: false,
+				message: () =>
+					'Game is NOT a match due to unexpected activities - ' +
+					JSON.stringify(received.activities),
+			};
 		}
 		return {
 			pass: true,
@@ -41,21 +39,19 @@ expect.extend({
 				pass: true,
 				message: () => 'Pending list is empty',
 			};
-		} else {
-			if (received.pending === undefined || players === undefined) {
-				return {
-					pass: false,
-					message: () =>
-						'Pending list does NOT match that provided - expected: ' +
-						JSON.stringify(players) +
-						'; received: ' +
-						JSON.stringify(received.pending),
-				};
-			}
+		} else if (received.pending === undefined || players === undefined) {
+			return {
+				pass: false,
+				message: () =>
+					'Pending list does NOT match that provided - expected: ' +
+					JSON.stringify(players) +
+					'; received: ' +
+					JSON.stringify(received.pending),
+			};
 		}
-		expect(received.pending!.length).toBe(players.length);
+		expect(received.pending.length).toBe(players.length);
 		for (let p = 0; p < players.length; p++) {
-			expect(received.pending!.at(p)!).toEqual(
+			expect(received.pending.at(p)!).toEqual(
 				expect.objectContaining({
 					nickname: players[p].nickname,
 					roles: [],
@@ -68,10 +64,8 @@ expect.extend({
 		};
 	},
 	toHavePlayers(received: Game, players: Array<Player>) {
-		expectTypeOf(received).toEqualTypeOf<Game>();
-		expect(received.players.length).toBe(players.length);
 		for (let p = 0; p < players.length; p++) {
-			const player = received.players!.at(p)!;
+			const player = received.players.at(p)!;
 			expectTypeOf(player).toEqualTypeOf<Player>();
 			expect(player.nickname).toEqual(players[p].nickname);
 			for (const role of players[p].roles) {
@@ -87,40 +81,80 @@ expect.extend({
 		expectTypeOf(received).toEqualTypeOf<Game>();
 		let match = false;
 		for (const a of received.activities!) {
-			expectTypeOf(a).toEqualTypeOf<Activity>();
-			const matchWolf =
-				a.wolf === activity.wolf ||
-				((a.wolf === null || a.wolf === undefined) &&
-					(activity.wolf === null || activity.wolf === undefined));
-			const matchHealer =
-				a.healer === activity.healer ||
-				((a.healer === null || a.healer === undefined) &&
-					activity.healer === null &&
-					activity.healer === undefined);
-			let matchVotes = false;
-			if (a.votes!.length === activity.votes!.length) {
-				matchVotes = true;
-				for (const key of Object.keys(a.votes!)) {
-					if (a.votes![key] !== activity.votes![key]) {
-						matchVotes = false;
-					}
-				}
-			}
-			const matchEvicted =
-				a.evicted === activity.evicted ||
-				((a.evicted === null || a.evicted === undefined) &&
-					activity.evicted === null &&
-					activity.evicted === undefined);
-			if (matchWolf && matchHealer && matchVotes && matchEvicted) {
+			try {
+				expectTypeOf(a).toEqualTypeOf<Activity>();
+				expect(a).toHaveChoices(activity);
+				expect(a).toHaveVotes(activity);
+				expect(a).toHaveEvicted(activity.evicted);
 				match = true;
+				break;
+			} catch {
+				// Intentionally ignored - we only care if none of them match
 			}
 		}
 		return {
 			pass: match,
-			message: () => 'Activity ' + (match ? '' : 'NOT ') + 'found on game',
+			message: () => (match ? 'Activity found on game' : 'Activity NOT found on game'),
 		};
 	},
-	async toHaveError(received: APIErrorResponse, message?: string) {
+	toHaveChoices(received: Activity, activity: Activity) {
+		const matchWolf =
+			received.wolf === activity.wolf ||
+			((received.wolf === null || received.wolf === undefined) &&
+				(activity.wolf === null || activity.wolf === undefined));
+		const matchHealer =
+			received.healer === activity.healer ||
+			((received.healer === null || received.healer === undefined) &&
+				activity.healer === null &&
+				activity.healer === undefined);
+		return {
+			pass: matchWolf && matchHealer,
+			message: () => 'Choices match those found on activity',
+		};
+	},
+	toHaveVotes(received: Activity, activity: Activity) {
+		let match = false;
+		if (
+			received.votes &&
+			activity.votes &&
+			Object.keys(received.votes).length === Object.keys(activity.votes).length
+		) {
+			match = true;
+			for (const key of Object.keys(received.votes)) {
+				if (received.votes[key] !== activity.votes[key]) {
+					match = false;
+				}
+			}
+		} else if (received.votes && activity.votes) {
+			match = true;
+		} else if (!received.votes && !activity.votes) {
+			match = true;
+		} else if (
+			(!received.votes && activity.votes && Object.keys(activity.votes).length === 0) ||
+			(received.votes && Object.keys(received.votes).length === 0 && !activity.votes)
+		) {
+			match = true;
+		}
+		return {
+			pass: match,
+			message: () =>
+				match
+					? 'Votes match those found on activity'
+					: 'Votes do NOT match those found on activity',
+		};
+	},
+	toHaveEvicted(received: Activity, name: Undefinable<Nullable<string>>) {
+		const match =
+			received.evicted === name ||
+			((received.evicted === null || received.evicted === undefined) &&
+				name === null &&
+				name === undefined);
+		return {
+			pass: match,
+			message: () => 'Eviction matches that on activity',
+		};
+	},
+	toHaveError(received: APIErrorResponse, message?: string) {
 		expectTypeOf(received).toEqualTypeOf<APIErrorResponse>();
 		if (message) {
 			expect(JSON.stringify(received)).toContain(message);
@@ -128,6 +162,21 @@ expect.extend({
 		return {
 			pass: true,
 			message: () => 'Expected error found',
+		};
+	},
+	toBeSocketCall(received: Mock, type: string, game) {
+		expect(received).toHaveBeenCalledWith(
+			{
+				game: game.id,
+			},
+			expect.objectContaining({
+				type: type,
+				game: expect.toEqualGame(game),
+			})
+		);
+		return {
+			pass: true,
+			message: () => 'WebSocket call matches expected call',
 		};
 	},
 });

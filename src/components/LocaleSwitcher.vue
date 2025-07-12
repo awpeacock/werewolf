@@ -15,6 +15,7 @@ const switchLocalePath = useSwitchLocalePath();
 		>
 			<img
 				:src="`/images/locale/${lang.code}.webp`"
+				:alt="$t('lang-' + lang.code + '-alt')"
 				width="30"
 				height="16"
 				class="mr-4 mt-4 mb-2"

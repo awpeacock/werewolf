@@ -3,25 +3,19 @@ import { fetch } from '@nuxt/test-utils/e2e';
 
 import {
 	AttemptToVoteOutsideDayErrorResponse,
-	CannotVoteForDeadPlayerErrorReponse,
-	CannotVoteForEvictedPlayerErrorReponse,
-	CannotVoteTwiceErrorReponse,
-	CannotVoteUntilActivityCompleteErrorReponse,
-	GameIdNotFoundErrorResponse,
-	InvalidActionErrorResponse,
+	CannotVoteForDeadPlayerErrorResponse,
+	CannotVoteForEvictedPlayerErrorResponse,
+	CannotVoteTwiceErrorResponse,
+	CannotVoteUntilActivityCompleteErrorResponse,
 	UnauthorisedErrorResponse,
-	UnexpectedErrorResponse,
 } from '@/types/constants';
 
 import {
-	stubGameNew,
-	stubGameIdNotFound,
 	stubWolf,
 	stubVillager6,
 	stubVillager8,
 	stubGameIncompleteActivity,
 	stubVillager7,
-	stubGameIdUpdateErrorDay,
 	stubGameIncorrectVotes1,
 	stubVotesIncorrect1,
 	stubGameTie,
@@ -37,10 +31,26 @@ import {
 	stubGameHealerOnly,
 	stubGameWolfOnly,
 } from '@tests/common/stubs';
+import { runCommonApiFailureTests } from '@tests/integration/setup/api';
 
 describe('PUT /api/games/:code/day', async () => {
-	const fetchDay = async (code: string | null | undefined, player: string, vote: string) => {
-		const url = `/api/games/${code}/day`;
+	const callback = async (
+		code: Undefinable<Nullable<string>>,
+		action: boolean
+	): Promise<Response> => {
+		return await fetchDay(code, stubWolf.id, stubVillager6.id, action);
+	};
+
+	const fetchDay = async (
+		code: string | null | undefined,
+		player: string,
+		vote: string,
+		action?: boolean
+	) => {
+		let url = `/api/games/${code}/`;
+		if (action !== false) {
+			url += 'day';
+		}
 		const json = JSON.stringify({ player: player, vote: vote });
 		const response = await fetch(url, {
 			method: 'PUT',
@@ -157,14 +167,14 @@ describe('PUT /api/games/:code/day', async () => {
 		);
 		expect(response.status).toBe(400);
 		const error: APIErrorResponse = await response.json();
-		expect(error).toEqual(CannotVoteForDeadPlayerErrorReponse);
+		expect(error).toEqual(CannotVoteForDeadPlayerErrorResponse);
 	});
 
 	it('should not allow a player to vote for an evicted villager', async () => {
 		const response = await fetchDay(stubGameWolfWin.id, stubWolf.id, stubVillager6.id);
 		expect(response.status).toBe(400);
 		const error: APIErrorResponse = await response.json();
-		expect(error).toEqual(CannotVoteForEvictedPlayerErrorReponse);
+		expect(error).toEqual(CannotVoteForEvictedPlayerErrorResponse);
 	});
 
 	it('should not allow a player to vote outside day time', async () => {
@@ -182,7 +192,7 @@ describe('PUT /api/games/:code/day', async () => {
 		);
 		expect(response.status).toBe(400);
 		const error: APIErrorResponse = await response.json();
-		expect(error).toEqual(CannotVoteUntilActivityCompleteErrorReponse);
+		expect(error).toEqual(CannotVoteUntilActivityCompleteErrorResponse);
 	});
 
 	it('should not allow a player to vote if the healer choice has not been made', async () => {
@@ -193,7 +203,7 @@ describe('PUT /api/games/:code/day', async () => {
 		);
 		expect(response.status).toBe(400);
 		const error: APIErrorResponse = await response.json();
-		expect(error).toEqual(CannotVoteUntilActivityCompleteErrorReponse);
+		expect(error).toEqual(CannotVoteUntilActivityCompleteErrorResponse);
 	});
 
 	it('should not allow a player to vote twice', async () => {
@@ -204,73 +214,8 @@ describe('PUT /api/games/:code/day', async () => {
 		);
 		expect(response.status).toBe(400);
 		const error: APIErrorResponse = await response.json();
-		expect(error).toEqual(CannotVoteTwiceErrorReponse);
+		expect(error).toEqual(CannotVoteTwiceErrorResponse);
 	});
 
-	it('should return an ErrorResponse (with validation messages) if the code is invalid', async () => {
-		const codes = [
-			null,
-			undefined,
-			'',
-			'ABC',
-			'ABCDE',
-			'abcd',
-			'AB-C',
-			'A BC',
-			'AB<1',
-			"AB'1",
-			'AB,1',
-			'AB;1',
-		];
-		const errors = [
-			'code-invalid',
-			'code-invalid',
-			'code-required',
-			'code-no-spaces',
-			'code-max',
-			'code-invalid',
-			'code-invalid',
-			'code-invalid',
-			'code-invalid',
-			'code-invalid',
-			'code-invalid',
-			'code-invalid',
-		];
-		for (let c = 0; c < codes.length; c++) {
-			const response = await fetchDay(codes[c], stubWolf.id, stubVillager6.id);
-			expect(response.status).toBe(400);
-			const error: APIErrorResponse = await response.json();
-			expect(error).toHaveError(errors[c]);
-		}
-	});
-
-	it('should return a 404 if the code is not found', async () => {
-		const response = await fetchDay(stubGameIdNotFound, stubWolf.id, stubVillager6.id);
-		expect(response.status).toBe(404);
-		const error: APIErrorResponse = await response.json();
-		expect(error).toEqual(GameIdNotFoundErrorResponse);
-	});
-
-	it('should return an ErrorResponse if no action is supplied', async () => {
-		const response = await fetch(`/api/games/${stubGameNew.id}`, {
-			method: 'PUT',
-			body: JSON.stringify({
-				player: stubWolf.id,
-				vote: stubVillager6.id,
-			}),
-			headers: {
-				'Content-Type': 'application/json',
-			},
-		});
-		expect(response.status).toBe(400);
-		const error: APIErrorResponse = await response.json();
-		expect(error).toEqual(InvalidActionErrorResponse);
-	});
-
-	it('should return an ErrorResponse (with unexpected error) if DynamoDB fails', async () => {
-		const response = await fetchDay(stubGameIdUpdateErrorDay, stubWolf.id, stubVillager6.id);
-		expect(response.status).toBe(500);
-		const error: APIErrorResponse = await response.json();
-		expect(error).toEqual(UnexpectedErrorResponse);
-	});
+	runCommonApiFailureTests('day', callback);
 });

@@ -5,6 +5,7 @@ import { expect } from '@tests/e2e/setup/expect';
 export interface Simulation {
 	inject: (_game: Game, _player?: Player) => Promise<void>;
 	go: (_path: string, _options?: Options) => Promise<void>;
+	begin: (_browser: Browser, _names: Array<string>) => Promise<void>;
 	createGame: (_options: Options, _invite?: boolean, _play?: boolean) => Promise<void>;
 	joinGame: (_options: Options) => Promise<void>;
 	addPlayers: (_browser: Browser, _names: Array<string>) => Promise<void>;
@@ -50,13 +51,19 @@ export interface Options {
 	refresh?: string;
 }
 
+interface SimPlayer {
+	name: string;
+	page: Page;
+	context: BrowserContext;
+}
+
 export const simulate = async (page: Page, locale: string, entry: string): Promise<Simulation> => {
 	const { default: i18n } = await import(`@/i18n/locales/${locale}.json`, {
 		with: { type: 'json' },
 	});
 	const prefix = locale === 'en' ? '' : '/' + locale;
 	const details: GameDetails = { dead: [], evicted: [] };
-	const players: Array<{ name: string; page: Page; context: BrowserContext }> = [];
+	const players: Array<SimPlayer> = [];
 
 	const inject = async (game: Game, player?: Player): Promise<void> => {
 		await page.evaluate(
@@ -100,6 +107,33 @@ export const simulate = async (page: Page, locale: string, entry: string): Promi
 		});
 	};
 
+	const get = (role: string): SimPlayer => {
+		if (role !== 'wolf' && role !== 'healer') {
+			throw new Error('Attempt to retrieve player other than wolf or healer');
+		}
+		for (const player of players) {
+			if (player.name === details[role]) {
+				return player;
+			}
+		}
+		throw new Error(`Player with role "${role}" not found`);
+	};
+
+	const begin = async (browser: Browser, names: Array<string>): Promise<void> => {
+		await createGame(
+			{
+				parameters: { nickname: names[0] },
+				result: { success: true },
+			},
+			true,
+			true
+		);
+		await expect(page).not.toBeReady();
+
+		await addPlayers(browser, names);
+		await handleAdmissions(6, [names[3], names[4], names[6], names[7]], [names[5], names[8]]);
+	};
+
 	const createGame = async (
 		options: Options,
 		invite?: boolean,
@@ -108,7 +142,7 @@ export const simulate = async (page: Page, locale: string, entry: string): Promi
 		await go('/create', { parameters: { button: 'create-game' } });
 		await expect(page).toBeCreatePage();
 
-		await expect(page).toValidateNickname(options.parameters!.nickname!);
+		await expect(page).toValidateNickname(options.parameters!.nickname);
 
 		const button = page.getByTestId('create-button');
 		await expect(button).toBeVisible();
@@ -181,21 +215,21 @@ export const simulate = async (page: Page, locale: string, entry: string): Promi
 		if (options.parameters!.code) {
 			await expect(session).toValidateCode(options.parameters!.code);
 		}
-		await expect(session).toValidateNickname(options.parameters!.nickname!);
+		await expect(session).toValidateNickname(options.parameters!.nickname);
 
 		const button = session.getByTestId('join-button');
 		await expect(button).toBeVisible();
 		await button.click();
 		await expect(session).toHaveSpinner();
 
-		if (options.result && options.result.success) {
+		if (options.result?.success) {
 			if (accepted) {
 				await expect(session).toBeAdmitted();
 			} else {
 				await expect(session).toHaveJoinedGame();
 			}
 		} else if (options.result) {
-			await expect(session).toHaveError(options.result!.message!.replace('{mayor}', ''));
+			await expect(session).toHaveError(options.result.message!.replace('{mayor}', ''));
 		}
 	};
 
@@ -270,7 +304,7 @@ export const simulate = async (page: Page, locale: string, entry: string): Promi
 		await expect(button).toBeVisible();
 		await button.click();
 
-		const success = options.result?.success !== undefined ? options.result?.success : true;
+		const success = options.result?.success ?? true;
 		if (success) {
 			await expect(session.getByTestId('yes')).toHaveCount(before - 1);
 			await expect(session.getByTestId('no')).toHaveCount(before - 1);
@@ -321,7 +355,7 @@ export const simulate = async (page: Page, locale: string, entry: string): Promi
 		const start = page.getByRole('link', { name: i18n['start-game'] });
 		await start.click();
 		await expect(page).toHaveSpinner();
-		const success = options?.result?.success !== undefined ? options?.result?.success : true;
+		const success = options?.result?.success ?? true;
 		if (success) {
 			log(`Game started`);
 		}
@@ -373,7 +407,7 @@ export const simulate = async (page: Page, locale: string, entry: string): Promi
 
 	const rejoin = async (options?: Options): Promise<void> => {
 		let session = page;
-		if (options && options.session) {
+		if (options?.session) {
 			session = options.session;
 			if (options.navigate) {
 				await go('/', { session: session });
@@ -452,7 +486,7 @@ export const simulate = async (page: Page, locale: string, entry: string): Promi
 	};
 
 	const choose = async (options: Options): Promise<void> => {
-		const success = options.result?.success !== undefined ? options.result?.success : true;
+		const success = options.result?.success ?? true;
 		// Separate out the actual action part of this, so it can be called individually
 		const action = async (session: Page, target: string, success: boolean) => {
 			const button = session.getByRole('link', { name: target });
@@ -473,15 +507,9 @@ export const simulate = async (page: Page, locale: string, entry: string): Promi
 		// the wolf chooses first, and vice versa
 		let message = '';
 		for (const key of Object.keys(options.parameters!)) {
-			if (key !== 'wolf' && key !== 'healer') {
-				continue;
-			}
-			for (const player of players) {
-				if (player.name === details[key]) {
-					await action(player.page, options.parameters![key]!, success);
-					message += `${player.name} (${key}) chose ${options.parameters![key]!}. `;
-				}
-			}
+			const player = get(key);
+			await action(player.page, options.parameters![key]!, success);
+			message += `${player.name} (${key}) chose ${options.parameters![key]!}. `;
 		}
 		if (success) {
 			if (options.parameters!.wolf !== options.parameters!.healer) {
@@ -491,8 +519,8 @@ export const simulate = async (page: Page, locale: string, entry: string): Promi
 			log(message);
 		}
 		for (const player of players) {
-			if (options && options.refresh === player.name) {
-				await rejoin({ session: player.page });
+			if (options?.refresh === player.name) {
+				await rejoin({ session: player.page, navigate: options?.navigate });
 				await expect(player.page).toHaveMadeDecision();
 			}
 		}
@@ -542,7 +570,7 @@ export const simulate = async (page: Page, locale: string, entry: string): Promi
 				}
 			})
 		);
-		const success = options?.result?.success !== undefined ? options.result.success : true;
+		const success = options?.result?.success ?? true;
 		if (success) {
 			if (majority) {
 				details.evicted.push(majority);
@@ -606,14 +634,12 @@ export const simulate = async (page: Page, locale: string, entry: string): Promi
 					if (details.wolf === player.name) {
 						await expect(player.page).toHaveWon('wolf', details.wolf);
 					} else {
-						await expect(player.page).not.toHaveWon('village', details.wolf!);
+						await expect(player.page).not.toHaveWon('village', details.wolf);
 					}
+				} else if (details.wolf === player.name) {
+					await expect(player.page).not.toHaveWon('wolf', details.wolf);
 				} else {
-					if (details.wolf === player.name) {
-						await expect(player.page).not.toHaveWon('wolf', details.wolf);
-					} else {
-						await expect(player.page).toHaveWon('village', details.wolf!);
-					}
+					await expect(player.page).toHaveWon('village', details.wolf);
 				}
 				// Make sure the game stays successfully finished upon refresh
 				await player.page.reload();
@@ -637,6 +663,7 @@ export const simulate = async (page: Page, locale: string, entry: string): Promi
 	return {
 		inject,
 		go,
+		begin,
 		createGame,
 		joinGame,
 		addPlayers,

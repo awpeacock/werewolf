@@ -1,3 +1,5 @@
+import type { Page } from '@playwright/test';
+
 import { GameIdNotFoundErrorResponse, UnexpectedErrorResponse } from '@/types/constants';
 
 import {
@@ -14,9 +16,30 @@ import {
 import { mockApi } from '@tests/e2e/setup/api';
 import { expect } from '@tests/e2e/setup/expect';
 import { simulate } from '@tests/e2e/setup/simulate';
+import type { Simulation } from '@tests/e2e/setup/simulate';
 import { test } from '@tests/e2e/setup/test';
 
 test.describe('Join game', () => {
+	const mockJoin = async (
+		simulation: Simulation,
+		page: Page,
+		game: Game,
+		player: Player,
+		success?: boolean
+	) => {
+		await mockApi(page, `/api/games/${game.id}/`, 200, JSON.stringify(game), true);
+		await simulation.inject(game, player);
+		await page.reload();
+
+		if (success === false) {
+			await expect(page).not.toHaveJoinedGame();
+			await expect(page).toBeDenied();
+		} else {
+			await expect(page).toHaveJoinedGame();
+			expect(await page.innerText('main')).toContain(player.nickname);
+		}
+	};
+
 	test.each(['en', 'de'])('Join game manually', async ({ locale, page }) => {
 		const simulation = await simulate(page, locale, '/join');
 
@@ -138,37 +161,21 @@ test.describe('Join game', () => {
 		const simulation = await simulate(page, locale, '/join');
 
 		const game = structuredClone(stubGamePending);
-		await mockApi(page, `/api/games/${game.id}/`, 200, JSON.stringify(game), true);
-		await simulation.inject(game, stubVillager1);
-		await page.reload();
-
-		await expect(page).toHaveJoinedGame();
-		expect(await page.innerText('main')).toContain(stubVillager1.nickname);
+		await mockJoin(simulation, page, game, stubVillager1);
 	});
 
 	test.each(['en', 'de'])('Handle coming back admitted', async ({ locale, page }) => {
 		const simulation = await simulate(page, locale, '/join');
 
 		const game = structuredClone(stubGameInactive);
-		await mockApi(page, `/api/games/${game.id}/`, 200, JSON.stringify(game), true);
-		await simulation.inject(game, stubVillager1);
-		await page.reload();
-
-		await expect(page).toHaveJoinedGame();
-		expect(await page.innerText('main')).toContain(stubVillager1.nickname);
+		await mockJoin(simulation, page, game, stubVillager1);
 	});
 
 	test.each(['en', 'de'])('Handle coming back denied', async ({ locale, page }) => {
 		const simulation = await simulate(page, locale, '/join');
 
 		const game = structuredClone(stubGameInactive);
-		await mockApi(page, `/api/games/${game.id}/`, 200, JSON.stringify(game), true);
-		await simulation.inject(game, stubVillager2);
-		await page.reload();
-
-		await expect(page).not.toHaveJoinedGame();
-		await expect(page).toBeDenied();
-		expect(await page.innerText('main')).toContain(stubVillager2.nickname);
+		await mockJoin(simulation, page, game, stubVillager2, false);
 	});
 
 	test.each(['en', 'de'])(

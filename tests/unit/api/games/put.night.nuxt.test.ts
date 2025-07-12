@@ -2,28 +2,25 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
 	AttemptToChooseOutsideNightErrorResponse,
-	GameIdNotFoundErrorResponse,
-	InvalidActionErrorResponse,
+	CannotChooseDeadPlayerErrorResponse,
+	CannotChooseEvictedPlayerErrorResponse,
 	UnauthorisedErrorResponse,
-	UnexpectedErrorResponse,
 } from '@/types/constants';
 import { Role } from '@/types/enums';
 
 import {
-	stubErrorCode,
-	stubGameIdNotFound,
-	stubGameIdUpdateError,
 	stubGameActive,
 	stubVillager6,
 	stubWolf,
 	stubHealer,
 	stubVillager7,
 	stubMayor,
-	stubGameUpdateFailure,
 	stubGameCorrectVotes,
 	stubGameDeadHealer,
+	stubGameIncorrectVotes1,
+	stubActivitiesComplete,
 } from '@tests/common/stubs';
-import { mockResponseStatus } from '@tests/unit/setup/api';
+import { mockResponseStatus, runCommonApiFailureTests } from '@tests/unit/setup/api';
 import { mockDynamoResponse, setupDynamoWrapperForEvent } from '@tests/unit/setup/dynamodb';
 import { setupRuntimeConfigForApis } from '@tests/unit/setup/runtime';
 import { mockWSSend } from '@tests/unit/setup/websocket';
@@ -34,6 +31,27 @@ describe('Night API (PUT)', async () => {
 	const spyLog = vi.spyOn(console, 'log').mockImplementation(() => {});
 	const event = await setupDynamoWrapperForEvent();
 	expect(spyLog).toBeCalled();
+
+	const callback = (code: Undefinable<Nullable<string>>, action: boolean) => {
+		stubParameters(code, action, Role.WOLF, stubWolf.id, stubVillager6.id);
+	};
+
+	const setupGame = (game: Game, evicted?: Player): Game => {
+		const clone = structuredClone(game);
+		clone.activities!.at(-1)!.votes![stubVillager6.id] = stubHealer.id;
+		if (evicted) {
+			clone.activities!.at(-1)!.evicted = evicted.id;
+		}
+		clone.stage = 'night';
+		mockDynamoResponse(clone);
+		return clone;
+	};
+
+	const expectError = async (code: number, error: APIErrorResponse): Promise<void> => {
+		const response = await handler.default(event);
+		expect(response).toMatchObject(error);
+		expect(mockResponseStatus).toBeCalledWith(event, code);
+	};
 
 	const stubParameters = (
 		id: Nullable<Undefinable<string>>,
@@ -72,19 +90,7 @@ describe('Night API (PUT)', async () => {
 				stubParameters(stubGameActive.id, true, Role.WOLF, w, v);
 
 				const response = (await handler.default(event)) as Game;
-				expect(response).toMatchObject({
-					id: stubGameActive.id,
-					active: true,
-					stage: 'night',
-					players: expect.arrayContaining(
-						stubGameActive.players.map((p) =>
-							expect.objectContaining({
-								id: p.id,
-								nickname: p.nickname,
-							})
-						)
-					),
-				});
+				expect(response).toEqualGame(stubGameActive);
 				expect(mockResponseStatus).toBeCalledWith(event, 200);
 
 				expect(response.activities?.at(-1)).toEqual(
@@ -105,57 +111,12 @@ describe('Night API (PUT)', async () => {
 				stubParameters(stubGameActive.id, true, Role.HEALER, h, v);
 
 				const response = (await handler.default(event)) as Game;
-				expect(response).toMatchObject({
-					id: stubGameActive.id,
-					active: true,
-					stage: 'night',
-					players: expect.arrayContaining(
-						stubGameActive.players.map((p) =>
-							expect.objectContaining({
-								id: p.id,
-								nickname: p.nickname,
-							})
-						)
-					),
-				});
+				expect(response).toEqualGame(stubGameActive);
 				expect(mockResponseStatus).toBeCalledWith(event, 200);
 
 				expect(response.activities?.at(-1)).toEqual(
 					expect.objectContaining({
 						healer: stubVillager6.id,
-					})
-				);
-			}
-		}
-	});
-
-	it('should take a valid request for the choice of a wolf, when the healer is dead, completing the night', async () => {
-		const wolf = [stubWolf.id, stubWolf.nickname];
-		const victim = [stubVillager6.id, stubVillager6.nickname];
-		for (const w of wolf) {
-			for (const v of victim) {
-				mockDynamoResponse(stubGameActive);
-				stubParameters(stubGameActive.id, true, Role.WOLF, w, v);
-
-				const response = (await handler.default(event)) as Game;
-				expect(response).toMatchObject({
-					id: stubGameActive.id,
-					active: true,
-					stage: 'night',
-					players: expect.arrayContaining(
-						stubGameActive.players.map((p) =>
-							expect.objectContaining({
-								id: p.id,
-								nickname: p.nickname,
-							})
-						)
-					),
-				});
-				expect(mockResponseStatus).toBeCalledWith(event, 200);
-
-				expect(response.activities?.at(-1)).toEqual(
-					expect.objectContaining({
-						wolf: stubVillager6.id,
 					})
 				);
 			}
@@ -170,19 +131,9 @@ describe('Night API (PUT)', async () => {
 		stubParameters(stubGameActive.id, true, Role.WOLF, stubWolf.id, stubVillager6.id);
 
 		const response = (await handler.default(event)) as Game;
-		expect(response).toMatchObject({
-			id: stubGameActive.id,
-			active: true,
-			stage: 'day',
-			players: expect.arrayContaining(
-				stubGameActive.players.map((p) =>
-					expect.objectContaining({
-						id: p.id,
-						nickname: p.nickname,
-					})
-				)
-			),
-		});
+		game.stage = 'day';
+		game.activities!.at(-1)!.wolf = stubVillager6.id;
+		expect(response).toEqualGame(game);
 		expect(mockResponseStatus).toBeCalledWith(event, 200);
 
 		const activity: Activity = {
@@ -192,19 +143,7 @@ describe('Night API (PUT)', async () => {
 		expect(response.activities?.at(-1)).toEqual(activity);
 
 		// Test that the web socket notification is published
-		expect(mockWSSend).toHaveBeenCalledWith(
-			{
-				game: stubGameActive.id,
-			},
-			expect.objectContaining({
-				type: 'morning',
-				game: expect.objectContaining({
-					id: stubGameActive.id,
-					active: true,
-					activities: expect.arrayContaining([expect.objectContaining(activity)]),
-				}),
-			})
-		);
+		expect(mockWSSend).toBeSocketCall('morning', game);
 	});
 
 	it('should take a valid request from a healer that completes the night, and send out an event', async () => {
@@ -215,19 +154,9 @@ describe('Night API (PUT)', async () => {
 		stubParameters(stubGameActive.id, true, Role.HEALER, stubHealer.id, stubVillager6.id);
 
 		const response = (await handler.default(event)) as Game;
-		expect(response).toMatchObject({
-			id: stubGameActive.id,
-			active: true,
-			stage: 'day',
-			players: expect.arrayContaining(
-				stubGameActive.players.map((p) =>
-					expect.objectContaining({
-						id: p.id,
-						nickname: p.nickname,
-					})
-				)
-			),
-		});
+		game.stage = 'day';
+		game.activities!.at(-1)!.healer = stubVillager6.id;
+		expect(response).toEqualGame(game);
 		expect(mockResponseStatus).toBeCalledWith(event, 200);
 
 		const activity: Activity = {
@@ -237,19 +166,7 @@ describe('Night API (PUT)', async () => {
 		expect(response.activities?.at(-1)).toEqual(activity);
 
 		// Test that the web socket notification is published
-		expect(mockWSSend).toHaveBeenCalledWith(
-			{
-				game: stubGameActive.id,
-			},
-			expect.objectContaining({
-				type: 'morning',
-				game: expect.objectContaining({
-					id: stubGameActive.id,
-					active: true,
-					activities: expect.arrayContaining([expect.objectContaining(activity)]),
-				}),
-			})
-		);
+		expect(mockWSSend).toBeSocketCall('morning', game);
 	});
 
 	it('should take a valid request for the choice of a wolf, when the healer is dead, completing the night', async () => {
@@ -258,24 +175,15 @@ describe('Night API (PUT)', async () => {
 		for (const w of wolf) {
 			for (const v of victim) {
 				const game = structuredClone(stubGameDeadHealer);
+				game.activities!.at(-1)!.votes![stubVillager6.id] = stubVillager7.id;
 				mockDynamoResponse(game);
 
 				stubParameters(stubGameDeadHealer.id, true, Role.WOLF, w, v);
 
 				const response = (await handler.default(event)) as Game;
-				expect(response).toMatchObject({
-					id: stubGameDeadHealer.id,
-					active: true,
-					stage: 'day',
-					players: expect.arrayContaining(
-						stubGameDeadHealer.players.map((p) =>
-							expect.objectContaining({
-								id: p.id,
-								nickname: p.nickname,
-							})
-						)
-					),
-				});
+				game.stage = 'day';
+				game.activities!.push({ wolf: stubVillager6.id, healer: '-' });
+				expect(response).toEqualGame(game);
 				expect(mockResponseStatus).toBeCalledWith(event, 200);
 
 				const activity: Activity = {
@@ -286,21 +194,48 @@ describe('Night API (PUT)', async () => {
 				expect(response.activities?.at(-1)).toEqual(activity);
 
 				// Test that the web socket notification is published
-				expect(mockWSSend).toHaveBeenCalledWith(
-					{
-						game: stubGameDeadHealer.id,
-					},
-					expect.objectContaining({
-						type: 'morning',
-						game: expect.objectContaining({
-							id: stubGameDeadHealer.id,
-							active: true,
-							activities: expect.arrayContaining([expect.objectContaining(activity)]),
-						}),
-					})
-				);
+				expect(mockWSSend).toBeSocketCall('morning', game);
 			}
 		}
+	});
+
+	it('should reject a request for the choice of a wolf for a dead player', async () => {
+		const game = setupGame(stubGameCorrectVotes);
+		stubParameters(game.id, true, Role.WOLF, stubWolf.id, stubVillager7.id);
+		await expectError(400, CannotChooseDeadPlayerErrorResponse);
+	});
+
+	it('should reject a request for the choice of a healer for a dead player', async () => {
+		const game = setupGame(stubGameCorrectVotes);
+		stubParameters(game.id, true, Role.HEALER, stubHealer.id, stubVillager7.id);
+		await expectError(400, CannotChooseDeadPlayerErrorResponse);
+	});
+
+	it('should reject a request for the choice of a wolf for an evicted player', async () => {
+		const game = setupGame(stubGameIncorrectVotes1, stubVillager6);
+		stubParameters(game.id, true, Role.WOLF, stubWolf.id, stubVillager6.id);
+		await expectError(400, CannotChooseEvictedPlayerErrorResponse);
+	});
+
+	it('should reject a request for the choice of a healer for an evicted player', async () => {
+		const game = setupGame(stubGameIncorrectVotes1, stubVillager6);
+		stubParameters(game.id, true, Role.HEALER, stubHealer.id, stubVillager6.id);
+		await expectError(400, CannotChooseEvictedPlayerErrorResponse);
+	});
+
+	it('should reject a request for the choice of a healer if dead', async () => {
+		const game = setupGame(stubGameDeadHealer);
+		stubParameters(game.id, true, Role.HEALER, stubHealer.id, stubVillager6.id);
+		await expectError(403, UnauthorisedErrorResponse);
+	});
+
+	it('should reject a request for the choice of a healer if evicted', async () => {
+		const game = structuredClone(stubGameActive);
+		game.activities = [stubActivitiesComplete[0]];
+		game.stage = 'night';
+		mockDynamoResponse(game);
+		stubParameters(game.id, true, Role.HEALER, stubHealer.id, stubVillager6.id);
+		await expectError(403, UnauthorisedErrorResponse);
 	});
 
 	it('should reject a request for the choice of a wolf outside night time', async () => {
@@ -339,93 +274,5 @@ describe('Night API (PUT)', async () => {
 		expect(mockResponseStatus).toBeCalledWith(event, 403);
 	});
 
-	it('should return an ErrorResponse (with validation messages) if the code is invalid', async () => {
-		const codes = [
-			null,
-			undefined,
-			'',
-			'ABC',
-			'ABCDE',
-			'AB-C',
-			'A BC',
-			'AB<1',
-			"AB'1",
-			'AB,1',
-			'AB;1',
-		];
-		const errors = [
-			'code-required',
-			'code-required',
-			'code-required',
-			'code-no-spaces',
-			'code-max',
-			'code-invalid',
-			'code-no-spaces',
-			'code-invalid',
-			'code-invalid',
-			'code-invalid',
-			'code-invalid',
-		];
-		for (let c = 0; c < codes.length; c++) {
-			stubParameters(codes[c], true, Role.WOLF, stubWolf.id, stubVillager6.id);
-
-			const error = structuredClone(stubErrorCode);
-			error.errors[0].message = errors[c];
-			const response = await handler.default(event);
-
-			expect(response).not.toBeNull();
-			expect((response as APIErrorResponse).errors).toEqual(
-				expect.arrayContaining(error.errors)
-			);
-			expect(mockResponseStatus).toBeCalledWith(event, 400);
-		}
-	});
-
-	it('should return a 404 if the code is not found', async () => {
-		stubParameters(stubGameIdNotFound, true, Role.WOLF, stubWolf.id, stubVillager6.id);
-
-		const response = await handler.default(event);
-
-		expect(response).not.toBeNull();
-		expect(response).toEqual(GameIdNotFoundErrorResponse);
-		expect(mockResponseStatus).toBeCalledWith(event, 404);
-	});
-
-	it('should return an ErrorResponse if no action is supplied', async () => {
-		stubParameters(stubGameActive.id, false, Role.WOLF, stubWolf.id, stubVillager6.id);
-
-		const response = await handler.default(event);
-
-		expect(response).not.toBeNull();
-		expect(response).toEqual(InvalidActionErrorResponse);
-		expect(mockResponseStatus).toBeCalledWith(event, 400);
-	});
-
-	it('should return an ErrorResponse (with unexpected error) if DynamoDB fails', async () => {
-		const game = structuredClone(stubGameUpdateFailure);
-		game.stage = 'night';
-		mockDynamoResponse(game);
-		stubParameters(stubGameIdUpdateError, true, Role.WOLF, stubWolf.id, stubVillager6.id);
-		const spyError = vi.spyOn(console, 'error').mockImplementation(() => null);
-
-		const response = await handler.default(event);
-
-		expect(response).toEqual(UnexpectedErrorResponse);
-		expect(mockResponseStatus).toBeCalledWith(event, 500);
-		expect(spyError).toBeCalled();
-	});
-
-	it('should return an ErrorResponse (with unexpected error) if something other than DynamoDB fails', async () => {
-		const game = structuredClone(stubGameActive);
-		mockDynamoResponse(game);
-		// @ts-expect-error Type '{ id: string; }' is not assignable to type 'string'.
-		stubParameters({ id: 'Invalid' }, true, Role.WOLF, stubWolf.id, stubVillager6.id);
-		const spyError = vi.spyOn(console, 'error').mockImplementation(() => null);
-
-		const response = await handler.default(event);
-		expect(response).not.toBeNull();
-		expect(response).toEqual(UnexpectedErrorResponse);
-		expect(mockResponseStatus).toBeCalledWith(event, 500);
-		expect(spyError).toBeCalled();
-	});
+	runCommonApiFailureTests('night', handler, event, callback);
 });

@@ -1,114 +1,55 @@
 import { describe, expect, it } from 'vitest';
 
 describe('Validation utilities', () => {
+	const test = (
+		type: 'code' | 'nickname',
+		value: Undefinable<Nullable<string>>,
+		err?: Array<string>
+	) => {
+		let result;
+		if (type == 'code') {
+			result = useValidation().validateCode(value);
+		} else {
+			result = useValidation().validateNickname(value);
+		}
+		expect(result).not.toBeNull();
+		if (err) {
+			expect(result.length).toBe(err.length);
+			for (let e = 0; e < err.length; e++) {
+				expect(result[e]).toEqual({ field: type, message: err[e] });
+			}
+		} else {
+			expect(result.length).toBe(0);
+		}
+	};
+
 	it('should successfully validate a code', () => {
-		let result = useValidation().validateCode('A1B2');
-		expect(result).not.toBeNull();
-		expect(result.length).toBe(0);
-
-		result = useValidation().validateCode(null);
-		expect(result).not.toBeNull();
-		expect(result.length).toBe(1);
-		expect(result[0]).toEqual({ field: 'code', message: 'code-required' });
-
-		result = useValidation().validateCode(undefined);
-		expect(result).not.toBeNull();
-		expect(result[0]).toEqual({ field: 'code', message: 'code-required' });
-
-		result = useValidation().validateCode('');
-		expect(result).not.toBeNull();
-		expect(result.length).toBe(1);
-		expect(result[0]).toEqual({ field: 'code', message: 'code-required' });
-
-		result = useValidation().validateCode('A1B');
-		expect(result).not.toBeNull();
-		expect(result.length).toBe(1);
-		expect(result[0]).toEqual({ field: 'code', message: 'code-no-spaces' });
-
-		result = useValidation().validateCode('A1B2C');
-		expect(result).not.toBeNull();
-		expect(result.length).toBe(1);
-		expect(result[0]).toEqual({ field: 'code', message: 'code-max' });
-
-		result = useValidation().validateCode('A1-B');
-		expect(result).not.toBeNull();
-		expect(result.length).toBe(1);
-		expect(result[0]).toEqual({ field: 'code', message: 'code-invalid' });
-
-		result = useValidation().validateCode('A1B ');
-		expect(result).not.toBeNull();
-		expect(result.length).toBe(1);
-		expect(result[0]).toEqual({ field: 'code', message: 'code-no-spaces' });
-
-		result = useValidation().validateCode(' A1B');
-		expect(result).not.toBeNull();
-		expect(result.length).toBe(1);
-		expect(result[0]).toEqual({ field: 'code', message: 'code-no-spaces' });
-
-		result = useValidation().validateCode('A1 B');
-		expect(result).not.toBeNull();
-		expect(result.length).toBe(2);
-		expect(result[0]).toEqual({ field: 'code', message: 'code-no-spaces' });
-		expect(result[1]).toEqual({ field: 'code', message: 'code-invalid' });
-
-		result = useValidation().validateCode('A-1');
-		expect(result).not.toBeNull();
-		expect(result.length).toBe(2);
-		expect(result[0]).toEqual({ field: 'code', message: 'code-no-spaces' });
-		expect(result[1]).toEqual({ field: 'code', message: 'code-invalid' });
-
-		result = useValidation().validateCode('A1-B2');
-		expect(result).not.toBeNull();
-		expect(result.length).toBe(2);
-		expect(result[0]).toEqual({ field: 'code', message: 'code-max' });
-		expect(result[1]).toEqual({ field: 'code', message: 'code-invalid' });
+		test('code', 'A1B2');
+		test('code', null, ['code-required']);
+		test('code', undefined, ['code-required']);
+		test('code', '', ['code-required']);
+		test('code', 'A1B', ['code-no-spaces']);
+		test('code', 'A1B2C', ['code-max']);
+		test('code', 'A1-B', ['code-invalid']);
+		test('code', 'A1B ', ['code-no-spaces']);
+		test('code', ' A1B', ['code-no-spaces']);
+		test('code', 'A1 B', ['code-no-spaces', 'code-invalid']);
+		test('code', 'A-1', ['code-no-spaces', 'code-invalid']);
+		test('code', 'A1-B2', ['code-max', 'code-invalid']);
 	});
 
 	it('should successfully validate a nickname', () => {
-		let result = useValidation().validateNickname('Valid Nickname');
-		expect(result).not.toBeNull();
-		expect(result.length).toBe(0);
-
-		result = useValidation().validateNickname(null);
-		expect(result).not.toBeNull();
-		expect(result.length).toBe(1);
-		expect(result[0]).toEqual({ field: 'nickname', message: 'nickname-required' });
-
-		result = useValidation().validateNickname(undefined);
-		expect(result).not.toBeNull();
-		expect(result.length).toBe(1);
-		expect(result[0]).toEqual({ field: 'nickname', message: 'nickname-required' });
-
-		result = useValidation().validateNickname('');
-		expect(result).not.toBeNull();
-		expect(result.length).toBe(1);
-		expect(result[0]).toEqual({ field: 'nickname', message: 'nickname-required' });
-
-		result = useValidation().validateNickname('Nom');
-		expect(result).not.toBeNull();
-		expect(result.length).toBe(1);
-		expect(result[0]).toEqual({ field: 'nickname', message: 'nickname-min' });
-
-		result = useValidation().validateNickname('Overly Long Nickname');
-		expect(result).not.toBeNull();
-		expect(result.length).toBe(1);
-		expect(result[0]).toEqual({ field: 'nickname', message: 'nickname-max' });
-
-		result = useValidation().validateNickname('Invalid-Nickname');
-		expect(result).not.toBeNull();
-		expect(result.length).toBe(1);
-		expect(result[0]).toEqual({ field: 'nickname', message: 'nickname-invalid' });
-
-		result = useValidation().validateNickname('I-N');
-		expect(result).not.toBeNull();
-		expect(result.length).toBe(2);
-		expect(result[0]).toEqual({ field: 'nickname', message: 'nickname-min' });
-		expect(result[1]).toEqual({ field: 'nickname', message: 'nickname-invalid' });
-
-		result = useValidation().validateNickname('Invalid-Long-Nickname');
-		expect(result).not.toBeNull();
-		expect(result.length).toBe(2);
-		expect(result[0]).toEqual({ field: 'nickname', message: 'nickname-max' });
-		expect(result[1]).toEqual({ field: 'nickname', message: 'nickname-invalid' });
+		test('nickname', 'Valid Nickname');
+		test('nickname', 'Space at end ');
+		test('nickname', ' Space at start');
+		test('nickname', ' Space both ');
+		test('nickname', null, ['nickname-required']);
+		test('nickname', undefined, ['nickname-required']);
+		test('nickname', '', ['nickname-required']);
+		test('nickname', 'Nom', ['nickname-min']);
+		test('nickname', 'Overly Long Nickname', ['nickname-max']);
+		test('nickname', 'Invalid-Nickname', ['nickname-invalid']);
+		test('nickname', 'I-N', ['nickname-min', 'nickname-invalid']);
+		test('nickname', 'Invalid-Long-Nickname', ['nickname-max', 'nickname-invalid']);
 	});
 });

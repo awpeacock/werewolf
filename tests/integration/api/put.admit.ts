@@ -2,33 +2,39 @@ import { describe, expect, it } from 'vitest';
 import { fetch } from '@nuxt/test-utils/e2e';
 
 import {
-	GameIdNotFoundErrorResponse,
-	InvalidActionErrorResponse,
 	PlayerAlreadyAdmittedErrorResponse,
 	PlayerIdNotFoundErrorResponse,
 	UnauthorisedErrorResponse,
-	UnexpectedErrorResponse,
 } from '@/types/constants';
 
 import {
 	stubMayor,
 	stubVillager1,
 	stubGamePending,
-	stubGameNew,
-	stubGameIdNotFound,
-	stubGameIdUpdateError,
 	stubVillager2,
 	stubGameInactive,
 } from '@tests/common/stubs';
+import { runCommonApiFailureTests } from '@tests/integration/setup/api';
 
 describe('PUT /api/games/:code/admit', async () => {
+	const callback = async (
+		code: Undefinable<Nullable<string>>,
+		action: boolean
+	): Promise<Response> => {
+		return await fetchAdmit(code, stubMayor.id, stubVillager1.id, true, action);
+	};
+
 	const fetchAdmit = async (
 		code?: string | null,
 		auth?: string | null,
 		player?: string,
-		admit?: boolean
+		admit?: boolean,
+		action?: boolean
 	) => {
-		const url = `/api/games/${code}/admit`;
+		let url = `/api/games/${code}/`;
+		if (action !== false) {
+			url += 'admit';
+		}
 		const json = JSON.stringify({ auth: auth, villager: player, admit: admit });
 		const response = await fetch(url, {
 			method: 'PUT',
@@ -104,72 +110,5 @@ describe('PUT /api/games/:code/admit', async () => {
 		expect(error).toEqual(UnauthorisedErrorResponse);
 	});
 
-	it('should return an ErrorResponse (with validation messages) if the code is invalid', async () => {
-		const codes = [
-			null,
-			undefined,
-			'',
-			'ABC',
-			'ABCDE',
-			'abcd',
-			'AB-C',
-			'A BC',
-			'AB<1',
-			"AB'1",
-			'AB,1',
-			'AB;1',
-		];
-		const errors = [
-			'code-invalid',
-			'code-invalid',
-			'code-required',
-			'code-no-spaces',
-			'code-max',
-			'code-invalid',
-			'code-invalid',
-			'code-invalid',
-			'code-invalid',
-			'code-invalid',
-			'code-invalid',
-			'code-invalid',
-		];
-		for (let c = 0; c < codes.length; c++) {
-			const response = await fetchAdmit(codes[c], stubMayor.id, stubVillager1.id, true);
-			expect(response.status).toBe(400);
-			const error: APIErrorResponse = await response.json();
-			expect(error).toHaveError(errors[c]);
-		}
-	});
-
-	it('should return a 404 if the code is not found', async () => {
-		const response = await fetchAdmit(stubGameIdNotFound, stubMayor.id, stubVillager1.id, true);
-		expect(response.status).toBe(404);
-		const error: APIErrorResponse = await response.json();
-		expect(error).toEqual(GameIdNotFoundErrorResponse);
-	});
-
-	it('should return an ErrorResponse if no action is supplied', async () => {
-		const response = await fetch(`/api/games/${stubGameNew.id}`, {
-			method: 'PUT',
-			body: JSON.stringify({ auth: stubMayor.id, villager: stubVillager1.id, admit: true }),
-			headers: {
-				'Content-Type': 'application/json',
-			},
-		});
-		expect(response.status).toBe(400);
-		const error: APIErrorResponse = await response.json();
-		expect(error).toEqual(InvalidActionErrorResponse);
-	});
-
-	it('should return an ErrorResponse (with unexpected error) if DynamoDB fails', async () => {
-		const response = await fetchAdmit(
-			stubGameIdUpdateError,
-			stubMayor.id,
-			stubVillager1.id,
-			true
-		);
-		expect(response.status).toBe(500);
-		const error: APIErrorResponse = await response.json();
-		expect(error).toEqual(UnexpectedErrorResponse);
-	});
+	runCommonApiFailureTests('admit', callback);
 });

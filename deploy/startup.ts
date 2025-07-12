@@ -1,41 +1,48 @@
-import { exec } from 'child_process';
-import { existsSync } from 'fs';
+import { spawn } from 'child_process';
 import waitOn from 'wait-on';
 import open from 'open';
+import path from 'path';
+import fs from 'fs';
 
-import { heading, info, log, success, warn, fail, parseArguments } from './funcs';
+import { info, log, success, warn, init } from './funcs';
 
-const params = parseArguments(process.argv);
-const action = params['run'] ?? 'build';
-const build = params['build'] ? params['build'] === 'yes' : true;
-const env =
-	params['env'] ?? (action === 'build' || action === 'preview' ? 'production' : undefined);
+const { action, filename } = init('startup');
 
-if (action === 'build' && !build) {
-	process.exit(0);
-}
+let command: string;
+const args: Array<string> = [];
 
-heading(
-	(action === 'build' ? 'Building' : 'Starting') +
-		' Nuxt server for ' +
-		(env ? env.toUpperCase() : 'default') +
-		' environment'
-);
+const directory = path.join(process.cwd(), 'node_modules', '.bin');
+if (process.platform === 'win32') {
+	const executable = path.join(directory, 'nuxt.cmd');
 
-const filename = env ? `.env.${env}` : '.env';
-if (!existsSync(filename)) {
-	fail(`Environment file not found: ${filename}`);
-}
-
-const script = (action === 'build' ? 'nuxt build' : 'nuxt dev') + ` --dotenv ${filename}`;
-const nuxt = exec(script, (error, stdout, stderr) => {
-	if (error) {
-		fail(`Error starting Nuxt: ${error.message}`);
+	if (fs.existsSync(executable)) {
+		command = 'cmd.exe';
+		args.push('/c', executable);
+	} else {
+		warn(
+			'Nuxt executable not found in node_modules/.bin. Attempting to use "nuxt" from system PATH.'
+		);
+		command = 'nuxt';
 	}
-	if (stderr) {
-		warn('\x1b[31m\u2718 ' + stderr + '\x1b[0m');
+} else {
+	command = path.join(directory, 'nuxt');
+	if (!fs.existsSync(command)) {
+		warn(
+			'Nuxt executable not found in node_modules/.bin. Attempting to use "nuxt" from system PATH.'
+		);
+		command = 'nuxt';
 	}
-	log('\x1b[32m\u2713 ' + stdout + '\x1b[0m');
+}
+if (action === 'build') {
+	args.push('build');
+} else {
+	args.push('dev');
+}
+args.push('--dotenv', filename);
+
+const nuxt = spawn(command, args, {
+	stdio: 'pipe',
+	shell: false,
 });
 
 nuxt.stdout?.on('data', (data) => {

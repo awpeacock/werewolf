@@ -27,6 +27,27 @@ describe('POST /api/games', () => {
 		expect(game).toHavePlayers([stubMayor]);
 	});
 
+	it('should correctly trim the end of a nickname', async () => {
+		const response = await fetchPost(stubMayor.nickname + ' ');
+		expect(response.status).toBe(200);
+		const game: Game = await response.json();
+		expect(game).toHavePlayers([stubMayor]);
+	});
+
+	it('should correctly trim the start of a nickname', async () => {
+		const response = await fetchPost(' ' + stubMayor.nickname);
+		expect(response.status).toBe(200);
+		const game: Game = await response.json();
+		expect(game).toHavePlayers([stubMayor]);
+	});
+
+	it('should correctly trim both ends of a nickname', async () => {
+		const response = await fetchPost(' ' + stubMayor.nickname + ' ');
+		expect(response.status).toBe(200);
+		const game: Game = await response.json();
+		expect(game).toHavePlayers([stubMayor]);
+	});
+
 	it('should successfully return a Game object if it succeeds before the retry limit is exceeded', async () => {
 		const response = await fetchPost(stubNameDuplicate + ' 2');
 		expect(response.status).toBe(200);

@@ -5,10 +5,10 @@ import { useLogger } from '@/composables/useLogger';
 export const usePusherBroadcast = () => {
 	const config = useRuntimeConfig();
 	const pusher = new Pusher({
-		appId: config.public.PUSHER_APP_ID as string,
-		key: config.public.PUSHER_APP_KEY as string,
-		secret: config.PUSHER_APP_SECRET as string,
-		cluster: config.public.PUSHER_CLUSTER as string,
+		appId: config.public.PUSHER_APP_ID,
+		key: config.public.PUSHER_APP_KEY,
+		secret: config.PUSHER_APP_SECRET,
+		cluster: config.public.PUSHER_CLUSTER,
 		useTLS: true,
 	});
 

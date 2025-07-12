@@ -38,6 +38,12 @@ describe('Join Game page', () => {
 
 	const url = '/api/games/';
 
+	const reset = () => {
+		sessionStorage.clear();
+		useGameStore().$reset();
+		usePlayerStore().$reset();
+	};
+
 	const setupPage = async (
 		locale: string,
 		route?: string
@@ -94,7 +100,7 @@ describe('Join Game page', () => {
 		await input.find('input').trigger('input');
 		expect(input.emitted('update:modelValue')).toBeTruthy();
 		expect(input.emitted('update:modelValue')?.at(-1)?.at(0)).toBe(name);
-		const button = wrapper.find('button');
+		const button = wrapper.find('a');
 		await button.trigger('click');
 		await flushPromises();
 
@@ -103,7 +109,7 @@ describe('Join Game page', () => {
 			expect(spyApi).toHaveBeenCalled();
 
 			const expected: JoinRequestBody = {
-				villager: name,
+				villager: name.trim(),
 			};
 			expect(body).toEqual(expected);
 		} else {
@@ -111,9 +117,9 @@ describe('Join Game page', () => {
 		}
 		if (responseCode === 200) {
 			expect(spyGame).toHaveBeenCalledWith(responseData);
-			if (JSON.stringify(responseData).includes(name)) {
+			if (JSON.stringify(responseData).includes(name.trim())) {
 				expect(spyPlayer).toHaveBeenCalledWith(
-					expect.objectContaining({ nickname: name, roles: [] })
+					expect.objectContaining({ nickname: name.trim(), roles: [] })
 				);
 			}
 
@@ -177,9 +183,7 @@ describe('Join Game page', () => {
 	};
 
 	beforeEach(() => {
-		sessionStorage.clear();
-		useGameStore().$reset();
-		usePlayerStore().$reset();
+		reset();
 		vi.clearAllMocks();
 		// Each page visit will call this API now
 		server.use(
@@ -247,7 +251,7 @@ describe('Join Game page', () => {
 			await triggerInput(
 				wrapper,
 				stubGamePending.id,
-				stubGamePending.pending![0]!.nickname,
+				stubGamePending.pending![0].nickname,
 				true,
 				200,
 				stubGamePending
@@ -270,7 +274,7 @@ describe('Join Game page', () => {
 			await triggerInput(
 				wrapper,
 				stubGameInactive.id,
-				stubGameInactive.players![1]!.nickname,
+				stubGameInactive.players[1].nickname,
 				true,
 				200,
 				stubGameInactive
@@ -279,6 +283,21 @@ describe('Join Game page', () => {
 		}
 	);
 
+	it.each(['en', 'de'])('trims the nickname where necessary', async (locale: string) => {
+		const names = [
+			stubGamePending.pending![0].nickname + ' ',
+			' ' + stubGamePending.pending![0].nickname,
+			' ' + stubGamePending.pending![0].nickname + ' ',
+		];
+		for (const name of names) {
+			reset();
+			const wrapper = await setupPage(locale);
+			await triggerInput(wrapper, stubGamePending.id, name, true, 200, stubGamePending);
+			expectWait(wrapper, locale);
+			wrapper.unmount();
+		}
+	});
+
 	it.each(['en', 'de'])(
 		'reacts appropriately when an admitted response is published to a join request',
 		async (locale: string) => {
@@ -286,7 +305,7 @@ describe('Join Game page', () => {
 			await triggerInput(
 				wrapper,
 				stubGamePending.id,
-				stubGamePending.pending![0]!.nickname,
+				stubGamePending.pending![0].nickname,
 				true,
 				200,
 				stubGamePending
@@ -310,7 +329,7 @@ describe('Join Game page', () => {
 			await triggerInput(
 				wrapper,
 				stubGamePending.id,
-				stubGamePending.pending![0]!.nickname,
+				stubGamePending.pending![0].nickname,
 				true,
 				200,
 				stubGamePending
@@ -327,7 +346,7 @@ describe('Join Game page', () => {
 			expect(usePlayerStore().$reset).toBeCalled();
 			expectDenied(wrapper, locale);
 
-			const button = wrapper.find('button');
+			const button = wrapper.find('a');
 			await button.trigger('click');
 			await flushPromises();
 
@@ -404,7 +423,7 @@ describe('Join Game page', () => {
 		await triggerInput(
 			wrapper,
 			stubGamePending.id,
-			stubGamePending.pending![0]!.nickname,
+			stubGamePending.pending![0].nickname,
 			true,
 			200,
 			stubGamePending

@@ -4,18 +4,12 @@ import { fetch } from '@nuxt/test-utils/e2e';
 import { Role } from '@/types/enums';
 import {
 	AttemptToChooseOutsideNightErrorResponse,
-	GameIdNotFoundErrorResponse,
-	InvalidActionErrorResponse,
 	UnauthorisedErrorResponse,
-	UnexpectedErrorResponse,
 } from '@/types/constants';
 
 import {
 	stubWolf,
 	stubVillager6,
-	stubGameIdUpdateErrorNight,
-	stubGameNew,
-	stubGameIdNotFound,
 	stubGameActive,
 	stubHealer,
 	stubGameHealerOnly,
@@ -23,15 +17,27 @@ import {
 	stubGameCorrectVotes,
 	stubMayor,
 } from '@tests/common/stubs';
+import { runCommonApiFailureTests } from '@tests/integration/setup/api';
 
 describe('PUT /api/games/:code/night', async () => {
+	const callback = async (
+		code: Undefinable<Nullable<string>>,
+		action: boolean
+	): Promise<Response> => {
+		return await fetchNight(code, Role.WOLF, stubWolf.id, stubVillager6.id, action);
+	};
+
 	const fetchNight = async (
 		code: string | null | undefined,
 		role: Role.WOLF | Role.HEALER,
 		player: string,
-		target: string
+		target: string,
+		action?: boolean
 	) => {
-		const url = `/api/games/${code}/night`;
+		let url = `/api/games/${code}/`;
+		if (action !== false) {
+			url += 'night';
+		}
 		const json = JSON.stringify({ role: role, player: player, target: target });
 		const response = await fetch(url, {
 			method: 'PUT',
@@ -149,81 +155,5 @@ describe('PUT /api/games/:code/night', async () => {
 		expect(error).toEqual(UnauthorisedErrorResponse);
 	});
 
-	it('should return an ErrorResponse (with validation messages) if the code is invalid', async () => {
-		const codes = [
-			null,
-			undefined,
-			'',
-			'ABC',
-			'ABCDE',
-			'abcd',
-			'AB-C',
-			'A BC',
-			'AB<1',
-			"AB'1",
-			'AB,1',
-			'AB;1',
-		];
-		const errors = [
-			'code-invalid',
-			'code-invalid',
-			'code-required',
-			'code-no-spaces',
-			'code-max',
-			'code-invalid',
-			'code-invalid',
-			'code-invalid',
-			'code-invalid',
-			'code-invalid',
-			'code-invalid',
-			'code-invalid',
-		];
-		for (let c = 0; c < codes.length; c++) {
-			const response = await fetchNight(codes[c], Role.WOLF, stubWolf.id, stubVillager6.id);
-			expect(response.status).toBe(400);
-			const error: APIErrorResponse = await response.json();
-			expect(error).toHaveError(errors[c]);
-		}
-	});
-
-	it('should return a 404 if the code is not found', async () => {
-		const response = await fetchNight(
-			stubGameIdNotFound,
-			Role.WOLF,
-			stubWolf.id,
-			stubVillager6.id
-		);
-		expect(response.status).toBe(404);
-		const error: APIErrorResponse = await response.json();
-		expect(error).toEqual(GameIdNotFoundErrorResponse);
-	});
-
-	it('should return an ErrorResponse if no action is supplied', async () => {
-		const response = await fetch(`/api/games/${stubGameNew.id}`, {
-			method: 'PUT',
-			body: JSON.stringify({
-				role: Role.WOLF,
-				player: stubWolf.id,
-				target: stubVillager6.id,
-			}),
-			headers: {
-				'Content-Type': 'application/json',
-			},
-		});
-		expect(response.status).toBe(400);
-		const error: APIErrorResponse = await response.json();
-		expect(error).toEqual(InvalidActionErrorResponse);
-	});
-
-	it('should return an ErrorResponse (with unexpected error) if DynamoDB fails', async () => {
-		const response = await fetchNight(
-			stubGameIdUpdateErrorNight,
-			Role.WOLF,
-			stubWolf.id,
-			stubVillager6.id
-		);
-		expect(response.status).toBe(500);
-		const error: APIErrorResponse = await response.json();
-		expect(error).toEqual(UnexpectedErrorResponse);
-	});
+	runCommonApiFailureTests('night', callback);
 });

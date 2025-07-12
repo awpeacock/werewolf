@@ -20,11 +20,11 @@ import {
 	stubVillager8,
 	stubWolf,
 } from '@tests/common/stubs';
-import { waitFor } from '@tests/unit/setup/global';
-import { server, spyApi } from '@tests/unit/setup/api';
+import { server } from '@tests/unit/setup/api';
 import { mockGame } from '@tests/unit/setup/game';
 import { mockT, mockUseLocalePath, setLocale } from '@tests/unit/setup/i18n';
 import { mockNavigate, stubNuxtLink } from '@tests/unit/setup/navigation';
+import { setupPage, triggerAction } from '@tests/unit/setup/page';
 import { setMockMinPlayers, setupRuntimeConfigForApis } from '@tests/unit/setup/runtime';
 import { mockWSLatest } from '@tests/unit/setup/websocket';
 
@@ -37,57 +37,65 @@ describe('Play Game (Start Game) page', () => {
 	const storeGame = useGameStore();
 	const storePlayer = usePlayerStore();
 
-	const url = '/api/games/';
-
-	const setupPage = async (
+	const enterPage = async (
 		locale: string,
-		route?: string
-	): Promise<VueWrapper<InstanceType<typeof page>>> => {
-		setLocale(locale);
-
-		const wrapper = await mountSuspended(page, {
-			global: {
-				mocks: {
-					$t: mockT,
-				},
-				stubs: {
-					NuxtLink: stubNuxtLink,
-				},
-			},
-			route: route ?? '/play',
-		});
+		game: Game,
+		player: Nullable<Player>,
+		code?: Nullable<string>
+	): Promise<VueWrapper> => {
+		storeGame.set(structuredClone(game));
+		mockGame.getLatest = vi.fn().mockReturnValue(game);
+		if (player === null) {
+			storePlayer.$reset();
+		} else {
+			storePlayer.set(structuredClone(player));
+		}
+		let wrapper: VueWrapper;
+		if (code === null) {
+			wrapper = await setupPage(locale);
+		} else if (code) {
+			wrapper = await setupPage(locale, `/play/${code}`);
+		} else {
+			wrapper = await setupPage(locale, `/play/${game.id}`);
+		}
 		return wrapper;
 	};
 
-	const triggerStart = async (
-		wrapper: VueWrapper,
-		id: string,
+	const expectStart = async (
+		locale: string,
+		game: Game,
 		player: Player,
-		submit: boolean,
-		responseCode?: number,
-		responseData?: object
-	) => {
-		let body;
-		server.use(
-			http.put(url + id + '/start', async ({ request }) => {
-				body = await request.json();
-				spyApi(body);
-				return HttpResponse.json(responseData, { status: responseCode });
-			})
-		);
+		success: boolean
+	): Promise<void> => {
+		const wrapper = await enterPage(locale, game, player);
 
-		const button = wrapper.find('button');
-		button.trigger('click');
-		await flushPromises();
-		await nextTick();
-
-		if (submit) {
-			await waitFor(() => !wrapper.findComponent({ name: 'Spinner' }).exists());
-			expect(spyApi).toHaveBeenCalled();
-			expect(body).toEqual({ auth: player.id });
-		} else {
-			expect(spyApi).not.toHaveBeenCalled();
+		if (success) {
+			expect(wrapper.findComponent({ name: 'Button' }).exists()).toBeTruthy();
+			expect(wrapper.text()).toContain(`start-game (${locale}`);
+		} else if (player.id !== stubMayor.id) {
+			expect(wrapper.text()).toContain(`waiting-for-mayor-to-start (${locale})`);
 		}
+	};
+
+	const expectRedirect = async (
+		locale: string,
+		game: Game,
+		player: Nullable<Player>,
+		message: string,
+		code?: Nullable<string>
+	): Promise<void> => {
+		const wrapper = await enterPage(locale, game, player, code);
+
+		expect(wrapper.findComponent({ name: 'Error' }).exists()).toBeTruthy();
+		expect(wrapper.text()).toContain(`${message} (${locale})`);
+		expect(wrapper.findComponent({ name: 'Button' }).exists()).toBeTruthy();
+
+		const button = wrapper.find('a');
+		await button.trigger('click');
+		await flushPromises();
+
+		expect(mockNavigate).toHaveBeenCalled();
+		expect(mockUseLocalePath).toHaveBeenCalledWith('/');
 	};
 
 	beforeAll(() => {
@@ -104,12 +112,9 @@ describe('Play Game (Start Game) page', () => {
 	it.each(['en', 'de'])(
 		'should display the welcome page upon first (valid) arrival',
 		async (locale: string) => {
-			storeGame.set(structuredClone(stubGameInactive));
-			mockGame.getLatest = vi.fn().mockReturnValue(stubGameInactive);
 			const players = [stubMayor, stubVillager1];
 			for (const player of players) {
-				storePlayer.set(structuredClone(player));
-				const wrapper = await setupPage(locale, '/play/' + stubGameInactive.id);
+				const wrapper = await enterPage(locale, stubGameInactive, player);
 
 				expect(wrapper.text()).toContain(`welcome-to-lycanville (${locale})`);
 			}
@@ -151,148 +156,81 @@ describe('Play Game (Start Game) page', () => {
 	it.each(['en', 'de'])(
 		'should display a redirect page if no game code is supplied',
 		async (locale: string) => {
-			storeGame.set(structuredClone(stubGameInactive));
-			mockGame.getLatest = vi.fn().mockReturnValue(stubGameInactive);
-			storePlayer.set(structuredClone(stubVillager1));
-			const wrapper = await setupPage(locale);
-
-			expect(wrapper.findComponent({ name: 'Error' }).exists()).toBeTruthy();
-			expect(wrapper.text()).toContain(
-				`you-must-come-here-with-a-valid-game-code (${locale})`
+			await expectRedirect(
+				locale,
+				stubGameInactive,
+				stubVillager1,
+				'you-must-come-here-with-a-valid-game-code',
+				null
 			);
-			expect(wrapper.findComponent({ name: 'Button' }).exists()).toBeTruthy();
-
-			const button = wrapper.find('button');
-			await button.trigger('click');
-			await flushPromises();
-
-			expect(mockNavigate).toHaveBeenCalled();
-			expect(mockUseLocalePath).toHaveBeenCalledWith('/');
 		}
 	);
 
 	it.each(['en', 'de'])(
 		'should display a redirect page if a game code is supplied not matching the game in session',
 		async (locale: string) => {
-			storeGame.set(structuredClone(stubGameInactive));
-			mockGame.getLatest = vi.fn().mockReturnValue(stubGameInactive);
-			storePlayer.set(structuredClone(stubVillager1));
-			const wrapper = await setupPage(locale, '/play/' + stubGameNew.id);
-
-			expect(wrapper.findComponent({ name: 'Error' }).exists()).toBeTruthy();
-			expect(wrapper.text()).toContain(`you-have-the-wrong-game-code (${locale})`);
-			expect(wrapper.findComponent({ name: 'Button' }).exists()).toBeTruthy();
-
-			const button = wrapper.find('button');
-			await button.trigger('click');
-			await flushPromises();
-
-			expect(mockNavigate).toHaveBeenCalled();
-			expect(mockUseLocalePath).toHaveBeenCalledWith('/');
+			await expectRedirect(
+				locale,
+				stubGameInactive,
+				stubVillager1,
+				'you-have-the-wrong-game-code',
+				stubGameNew.id
+			);
 		}
 	);
 
 	it.each(['en', 'de'])(
 		'should display a redirect page if there is no player in session',
 		async (locale: string) => {
-			storeGame.set(structuredClone(stubGameInactive));
-			mockGame.getLatest = vi.fn().mockReturnValue(stubGameInactive);
-			storePlayer.$reset();
-			const wrapper = await setupPage(locale, '/play/' + stubGameInactive.id);
-
-			expect(wrapper.findComponent({ name: 'Error' }).exists()).toBeTruthy();
-			expect(wrapper.text()).toContain(`you-have-not-yet-joined (${locale})`);
-			expect(wrapper.findComponent({ name: 'Button' }).exists()).toBeTruthy();
-
-			const button = wrapper.find('button');
-			await button.trigger('click');
-			await flushPromises();
-
-			expect(mockNavigate).toHaveBeenCalled();
-			expect(mockUseLocalePath).toHaveBeenCalledWith('/');
+			await expectRedirect(locale, stubGameInactive, null, 'you-have-not-yet-joined');
 		}
 	);
 
 	it.each(['en', 'de'])(
 		'should display a redirect page if the player in session is only pending',
 		async (locale: string) => {
-			storeGame.set(structuredClone(stubGamePending));
-			mockGame.getLatest = vi.fn().mockReturnValue(stubGamePending);
-			storePlayer.set(structuredClone(stubVillager1));
-			const wrapper = await setupPage(locale, '/play/' + stubGamePending.id);
-
-			expect(wrapper.findComponent({ name: 'Error' }).exists()).toBeTruthy();
-			expect(wrapper.text()).toContain(
-				`the-mayor-has-not-selected-you-to-play-in-this-game (${locale})`
+			await expectRedirect(
+				locale,
+				stubGamePending,
+				stubVillager1,
+				'the-mayor-has-not-selected-you-to-play-in-this-game'
 			);
-			expect(wrapper.findComponent({ name: 'Button' }).exists()).toBeTruthy();
-
-			const button = wrapper.find('button');
-			await button.trigger('click');
-			await flushPromises();
-
-			expect(mockNavigate).toHaveBeenCalled();
-			expect(mockUseLocalePath).toHaveBeenCalledWith('/');
 		}
 	);
 
 	it.each(['en', 'de'])(
 		'should display a redirect page if the player does not exist in the game in session',
 		async (locale: string) => {
-			storeGame.set(structuredClone(stubGameInactive));
-			mockGame.getLatest = vi.fn().mockReturnValue(stubGameInactive);
-			storePlayer.set(structuredClone(stubVillager2));
-			const wrapper = await setupPage(locale, '/play/' + stubGameInactive.id);
-
-			expect(wrapper.findComponent({ name: 'Error' }).exists()).toBeTruthy();
-			expect(wrapper.text()).toContain(`you-are-not-a-player-in-this-game (${locale})`);
-			expect(wrapper.findComponent({ name: 'Button' }).exists()).toBeTruthy();
-
-			const button = wrapper.find('button');
-			await button.trigger('click');
-			await flushPromises();
-
-			expect(mockNavigate).toHaveBeenCalled();
-			expect(mockUseLocalePath).toHaveBeenCalledWith('/');
+			await expectRedirect(
+				locale,
+				stubGameInactive,
+				stubVillager2,
+				'you-are-not-a-player-in-this-game'
+			);
 		}
 	);
 
 	it.each(['en', 'de'])(
 		'should display the "Start Game" button for the mayor',
 		async (locale: string) => {
-			storeGame.set(structuredClone(stubGameReady));
-			mockGame.getLatest = vi.fn().mockReturnValue(stubGameReady);
-			storePlayer.set(structuredClone(stubMayor));
-			const wrapper = await setupPage(locale, '/play/' + stubGameReady.id);
-
-			expect(wrapper.findComponent({ name: 'Button' }).exists()).toBeTruthy();
-			expect(wrapper.text()).toContain(`start-game (${locale})`);
+			await expectStart(locale, stubGameReady, stubMayor, true);
 		}
 	);
 
 	it.each(['en', 'de'])(
 		'should display a message to players that the mayor needs to start the game and bouncing dots',
 		async (locale: string) => {
-			storeGame.set(structuredClone(stubGameReady));
-			mockGame.getLatest = vi.fn().mockReturnValue(stubGameReady);
-			storePlayer.set(structuredClone(stubVillager1));
-			const wrapper = await setupPage(locale, '/play/' + stubGameReady.id);
-
-			expect(wrapper.text()).toContain(`waiting-for-mayor-to-start (${locale})`);
+			await expectStart(locale, stubGameReady, stubVillager1, false);
 		}
 	);
 
 	it.each(['en', 'de'])(
 		'should take the player straight through if the game has already started',
 		async (locale: string) => {
-			storeGame.set(structuredClone(stubGameActive));
-			mockGame.getLatest = vi.fn().mockReturnValue(stubGameActive);
-
 			const players = [stubVillager6, stubVillager7, stubVillager8, stubWolf, stubHealer];
 			const roles = [Role.VILLAGER, Role.VILLAGER, Role.VILLAGER, Role.WOLF, Role.HEALER];
 			for (let p = 0; p < players.length; p++) {
-				storePlayer.set(structuredClone(players[p]));
-				const wrapper = await setupPage(locale, '/play/' + stubGameActive.id);
+				const wrapper = await enterPage(locale, stubGameActive, players[p]);
 
 				expect(wrapper.text()).toContain(`you-are (${locale})`);
 				expect(wrapper.text()).toContain(`${roles[p]} (${locale})`.toUpperCase());
@@ -303,12 +241,17 @@ describe('Play Game (Start Game) page', () => {
 	it.each(['en', 'de'])(
 		'should start the game when the mayor clicks the "Start Game" button',
 		async (locale: string) => {
-			storeGame.set(structuredClone(stubGameReady));
-			mockGame.getLatest = vi.fn().mockReturnValue(stubGameReady);
-			storePlayer.set(structuredClone(stubMayor));
-			const wrapper = await setupPage(locale, '/play/' + stubGameReady.id);
+			const wrapper = await enterPage(locale, stubGameReady, stubMayor);
 
-			await triggerStart(wrapper, stubGameReady.id, stubMayor, true, 200, stubGameActive);
+			await triggerAction(
+				wrapper,
+				'start',
+				stubGameReady,
+				stubMayor,
+				true,
+				200,
+				stubGameActive
+			);
 
 			expect(wrapper.findComponent({ name: 'Error' }).exists()).toBeFalsy();
 		}
@@ -354,7 +297,7 @@ describe('Play Game (Start Game) page', () => {
 			// works here and just give us the right payload so we can check the
 			// population is updated on screen
 			server.use(
-				http.put(url + game.id + '/admit', async ({ request }) => {
+				http.put(`/api/games/${game.id}/admit`, async ({ request }) => {
 					await request.json();
 					game.players.push(structuredClone(stubVillager2));
 					return HttpResponse.json(game, { status: 200 });
@@ -387,14 +330,12 @@ describe('Play Game (Start Game) page', () => {
 	it.each(['en', 'de'])(
 		'should handle the error if the mayor clicks the "Start Game" button for a non-existent game',
 		async (locale: string) => {
-			storeGame.set(structuredClone(stubGameReady));
-			mockGame.getLatest = vi.fn().mockReturnValue(stubGameReady);
-			storePlayer.set(structuredClone(stubMayor));
-			const wrapper = await setupPage(locale, '/play/' + stubGameReady.id);
+			const wrapper = await enterPage(locale, stubGameReady, stubMayor);
 
-			await triggerStart(
+			await triggerAction(
 				wrapper,
-				stubGameReady.id,
+				'start',
+				stubGameReady,
 				stubMayor,
 				true,
 				404,
@@ -409,14 +350,12 @@ describe('Play Game (Start Game) page', () => {
 	it.each(['en', 'de'])(
 		'should handle the error if the mayor clicks the "Start Game" button and is not authorised',
 		async (locale: string) => {
-			storeGame.set(structuredClone(stubGameReady));
-			mockGame.getLatest = vi.fn().mockReturnValue(stubGameReady);
-			storePlayer.set(structuredClone(stubMayor));
-			const wrapper = await setupPage(locale, '/play/' + stubGameReady.id);
+			const wrapper = await enterPage(locale, stubGameReady, stubMayor);
 
-			await triggerStart(
+			await triggerAction(
 				wrapper,
-				stubGameReady.id,
+				'start',
+				stubGameReady,
 				stubMayor,
 				true,
 				403,
@@ -431,12 +370,9 @@ describe('Play Game (Start Game) page', () => {
 	it.each(['en', 'de'])(
 		'should not allow the mayor to click the "Start Game" button if the minimum number of players have not joined',
 		async (locale: string) => {
-			storeGame.set(stubGameInactive);
-			mockGame.getLatest = vi.fn().mockReturnValue(stubGameInactive);
-			storePlayer.set(stubMayor);
-			const wrapper = await setupPage(locale, '/play/' + stubGameInactive.id);
+			const wrapper = await enterPage(locale, stubGameInactive, stubMayor);
 
-			await triggerStart(wrapper, stubGameInactive.id, stubMayor, false);
+			await triggerAction(wrapper, 'start', stubGameInactive, stubMayor, false);
 
 			expect(wrapper.text()).toContain(`welcome-to-lycanville (${locale})`);
 		}
@@ -449,12 +385,9 @@ describe('Play Game (Start Game) page', () => {
 			for (const m of min) {
 				setMockMinPlayers(m);
 
-				storeGame.set(stubGameInactive);
-				mockGame.getLatest = vi.fn().mockReturnValue(stubGameInactive);
-				storePlayer.set(stubMayor);
-				const wrapper = await setupPage(locale, '/play/' + stubGameInactive.id);
+				const wrapper = await enterPage(locale, stubGameInactive, stubMayor);
 
-				await triggerStart(wrapper, stubGameInactive.id, stubMayor, false);
+				await triggerAction(wrapper, 'start', stubGameInactive, stubMayor, false);
 
 				expect(wrapper.text()).toContain(`welcome-to-lycanville (${locale})`);
 			}
@@ -464,14 +397,10 @@ describe('Play Game (Start Game) page', () => {
 	it.each(['en', 'de'])(
 		'should move the screen on for all players when their player roles come through',
 		async (locale: string) => {
-			storeGame.set(structuredClone(stubGameReady));
-			mockGame.getLatest = vi.fn().mockReturnValue(stubGameReady);
-
 			const players = [stubVillager1, stubVillager2, stubVillager3];
 			const roles = [Role.WOLF, Role.HEALER, Role.VILLAGER];
 			for (let p = 0; p < players.length; p++) {
-				storePlayer.set(structuredClone(players[p]));
-				const wrapper = await setupPage(locale, '/play/' + stubGameReady.id);
+				const wrapper = await enterPage(locale, stubGameReady, players[p]);
 
 				mockWSLatest.value = {
 					type: 'start-game',
@@ -488,11 +417,7 @@ describe('Play Game (Start Game) page', () => {
 	);
 
 	it.each(['en', 'de'])('should ignore irrelevant WebSocket events', async (locale: string) => {
-		storeGame.set(structuredClone(stubGameReady));
-		mockGame.getLatest = vi.fn().mockReturnValue(stubGameReady);
-		storePlayer.set(structuredClone(stubVillager1));
-
-		const wrapper = await setupPage(locale, '/play/' + stubGameReady.id);
+		const wrapper = await enterPage(locale, stubGameReady, stubVillager1);
 
 		// Can't get to this screen without being accepted
 		mockWSLatest.value = {

@@ -27,3 +27,6 @@ logs
 coverage
 reports
 .nyc_output
+
+# SonarQube
+.scannerwork

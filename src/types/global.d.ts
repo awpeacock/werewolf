@@ -8,6 +8,8 @@ interface DynamoDBWrapper {
 	get: (id: string) => Promise<Nullable<Game>>;
 }
 
+type PutAction = 'start' | 'join' | 'admit' | 'night' | 'day';
+
 interface WebSocketServer {
 	clients: Map<string, Map<string, WebSocket>>;
 	send: (target: { code: string; player?: string }, event: GameEvent) => Promise<void>;

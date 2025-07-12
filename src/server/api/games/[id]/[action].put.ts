@@ -1,7 +1,9 @@
 import type { H3Event, EventHandlerRequest } from 'h3';
 import { v4 as uuidv4 } from 'uuid';
+import crypto from 'crypto';
 
 import { useGame } from '@/composables/useGame';
+import type { GameUtility } from '@/composables/useGame';
 import { useLogger } from '@/composables/useLogger';
 import { useValidation } from '@/composables/useValidation';
 import { useBroadcast } from '@/server/util/useBroadcast';
@@ -9,10 +11,12 @@ import { useDynamoDB } from '@/server/util/useDynamoDB';
 import {
 	AttemptToChooseOutsideNightErrorResponse,
 	AttemptToVoteOutsideDayErrorResponse,
-	CannotVoteForDeadPlayerErrorReponse,
-	CannotVoteForEvictedPlayerErrorReponse,
-	CannotVoteTwiceErrorReponse,
-	CannotVoteUntilActivityCompleteErrorReponse,
+	CannotChooseDeadPlayerErrorResponse,
+	CannotChooseEvictedPlayerErrorResponse,
+	CannotVoteForDeadPlayerErrorResponse,
+	CannotVoteForEvictedPlayerErrorResponse,
+	CannotVoteTwiceErrorResponse,
+	CannotVoteUntilActivityCompleteErrorResponse,
 	GameIdNotFoundErrorResponse,
 	InvalidActionErrorResponse,
 	NicknameAlreadyExistsErrorResponse,
@@ -58,13 +62,74 @@ export default defineEventHandler(
 			return UnexpectedErrorResponse;
 		};
 
+		// Validate the input to the API
+		const validate = (
+			util: GameUtility,
+			time: 'night' | 'day',
+			player: string,
+			target?: string
+		): Undefinable<APIErrorResponse> => {
+			if (util.isPlayerDead(player)) {
+				setResponseStatus(event, 403);
+				return UnauthorisedErrorResponse;
+			}
+			if (target && util.isPlayerDead(target)) {
+				setResponseStatus(event, 400);
+				return time === 'night'
+					? CannotChooseDeadPlayerErrorResponse
+					: CannotVoteForDeadPlayerErrorResponse;
+			}
+			if (util.isPlayerEvicted(player)) {
+				setResponseStatus(event, 403);
+				return UnauthorisedErrorResponse;
+			}
+			if (target && util.isPlayerEvicted(target)) {
+				setResponseStatus(event, 400);
+				return time === 'night'
+					? CannotChooseEvictedPlayerErrorResponse
+					: CannotVoteForEvictedPlayerErrorResponse;
+			}
+		};
+
+		// Helper method for detecting whether or not night-time activities are completed
+		const isNightComplete = (util: GameUtility, activity: Activity): boolean => {
+			const isWolfIncomplete = activity.wolf === null || activity.wolf === undefined;
+			const isHealerIncomplete =
+				(activity.healer === null || activity.healer === undefined) &&
+				!util.isPlayerDead(util.getHealer()!.id) &&
+				!util.isPlayerEvicted(util.getHealer()!.id);
+			return !isWolfIncomplete && !isHealerIncomplete;
+		};
+
+		const countVotes = (util: GameUtility, activity: Activity): void => {
+			// Do we move onto the next night, or is the game over (either they guessed
+			// right, or the wolf has won) - let's count up all the votes
+			const count: Record<string, number> = {};
+			for (const id of Object.values(activity.votes!)) {
+				if (!(id in count)) {
+					count[id] = 0;
+				}
+				count[id]++;
+			}
+			// If we have a tie, then the group was unable to decide, there is no vote winner
+			const sorted: Array<Array<string | number>> = Object.entries(count).sort(
+				(a, b) => b[1] - a[1]
+			);
+			if (sorted.at(0)?.at(1) !== sorted.at(1)?.at(1)) {
+				activity.evicted = util.findPlayer(sorted.at(0)?.at(0) as string)!.id;
+			} else {
+				activity.evicted = null;
+			}
+		};
+
 		// Handler for all join requests
 		const handleJoin = async (game: Game) => {
 			const invite = getQuery(event).invite;
 			const body: JoinRequestBody = await readBody(event);
+			const nickname = body.villager ? body.villager.trim() : null;
 
 			// Never trust only on client-side validation - let's do it all again
-			const errors: Array<APIError> = useValidation().validateNickname(body.villager);
+			const errors: Array<APIError> = useValidation().validateNickname(nickname);
 			if (errors.length > 0) {
 				const response: APIErrorResponse = { errors: errors };
 				setResponseStatus(event, 400);
@@ -72,14 +137,14 @@ export default defineEventHandler(
 			}
 
 			const gameUtil = useGame(game);
-			const existing: boolean = gameUtil.hasPlayer(body.villager);
+			const existing: boolean = gameUtil.hasPlayer(nickname!);
 			if (existing) {
 				setResponseStatus(event, 400);
 				return NicknameAlreadyExistsErrorResponse;
 			}
 			const player: Player = {
 				id: uuidv4(),
-				nickname: body.villager,
+				nickname: nickname!,
 				roles: [],
 			};
 
@@ -89,7 +154,7 @@ export default defineEventHandler(
 				game.players.push(player);
 			} else {
 				game.pending ??= [];
-				game.pending!.push(player);
+				game.pending.push(player);
 			}
 
 			const dynamo: DynamoDBWrapper = useDynamoDB(event);
@@ -188,8 +253,8 @@ export default defineEventHandler(
 			game.stage = 'night';
 
 			// Assign the wolf and healer roles
-			const wolf = Math.floor(Math.random() * game.players.length);
-			const healer = Math.floor(Math.random() * game.players.length);
+			const wolf = crypto.randomInt(game.players.length);
+			const healer = crypto.randomInt(game.players.length);
 			game.players[wolf].roles.push(Role.WOLF);
 			if (wolf === healer && healer < game.players.length - 1) {
 				game.players[healer + 1].roles.push(Role.HEALER);
@@ -237,6 +302,11 @@ export default defineEventHandler(
 			// Get the latest activity to add to it
 			const activity = gameUtil.getCurrentActivity();
 
+			const response = validate(gameUtil, 'night', body.player, body.target);
+			if (response) {
+				return response;
+			}
+
 			// Make sure the player ID matches up to the role
 			const player = gameUtil.findPlayer(body.player);
 			if (player?.roles.includes(Role.WOLF) && body.role === Role.WOLF) {
@@ -260,12 +330,7 @@ export default defineEventHandler(
 			}
 			const broadcast = useBroadcast();
 			let payload: Undefinable<MorningEvent>;
-			const waitingForWolf = activity.wolf === null || activity.wolf === undefined;
-			const waitingForHealer =
-				(activity.healer === null || activity.healer === undefined) &&
-				!gameUtil.isPlayerDead(gameUtil.getHealer()!.id) &&
-				!gameUtil.isPlayerEvicted(gameUtil.getHealer()!.id);
-			if (!waitingForWolf && !waitingForHealer) {
+			if (isNightComplete(gameUtil, activity)) {
 				game.stage = 'day';
 				payload = {
 					type: 'morning',
@@ -295,64 +360,30 @@ export default defineEventHandler(
 			const gameUtil = useGame(game);
 			// Get the latest activity to add to it
 			const activity = gameUtil.getCurrentActivity();
-			const waitingForWolf = activity.wolf === null || activity.wolf === undefined;
-			const waitingForHealer =
-				(activity.healer === null || activity.healer === undefined) &&
-				!gameUtil.isPlayerDead(gameUtil.getHealer()!.id) &&
-				!gameUtil.isPlayerEvicted(gameUtil.getHealer()!.id);
-			const valid = !waitingForWolf && !waitingForHealer;
+			const valid = isNightComplete(gameUtil, activity);
 			if (!valid) {
 				setResponseStatus(event, 400);
-				return CannotVoteUntilActivityCompleteErrorReponse;
+				return CannotVoteUntilActivityCompleteErrorResponse;
 			}
 
 			// Check it's a valid vote, then add to the activity
-			if (gameUtil.isPlayerDead(body.player)) {
-				setResponseStatus(event, 403);
-				return UnauthorisedErrorResponse;
-			}
-			if (gameUtil.isPlayerDead(body.vote)) {
-				setResponseStatus(event, 400);
-				return CannotVoteForDeadPlayerErrorReponse;
-			}
-			if (gameUtil.isPlayerEvicted(body.player)) {
-				setResponseStatus(event, 403);
-				return UnauthorisedErrorResponse;
-			}
-			if (gameUtil.isPlayerEvicted(body.vote)) {
-				setResponseStatus(event, 400);
-				return CannotVoteForEvictedPlayerErrorReponse;
+			const response = validate(gameUtil, 'day', body.player, body.vote);
+			if (response) {
+				return response;
 			}
 			const player = gameUtil.findPlayer(body.player) as Player;
 			const accused = gameUtil.findPlayer(body.vote) as Player;
 			activity.votes ??= {};
-			if (Object.keys(activity.votes!).includes(body.player)) {
+			if (Object.keys(activity.votes).includes(body.player)) {
 				setResponseStatus(event, 400);
-				return CannotVoteTwiceErrorReponse;
+				return CannotVoteTwiceErrorResponse;
 			}
 			activity.votes[player.id] = accused.id;
 
 			const broadcast = useBroadcast();
 			let payload: Undefinable<GameEvent>;
 			if (Object.keys(activity.votes).length === gameUtil.getAlivePlayers().length) {
-				// Do we move onto the next night, or is the game over (either they guessed
-				// right, or the wolf has won) - let's count up all the votes
-				const count: Record<string, number> = {};
-				for (const id of Object.values(activity.votes as Votes)) {
-					if (!(id in count)) {
-						count[id] = 0;
-					}
-					count[id]++;
-				}
-				// If we have a tie, then the group was unable to decide, there is no vote winner
-				const sorted: Array<Array<string | number>> = Object.entries(count).sort(
-					(a, b) => b[1] - a[1]
-				);
-				if (sorted.at(0)?.at(1) !== sorted.at(1)?.at(1)) {
-					activity.evicted = gameUtil.findPlayer(sorted.at(0)?.at(0) as string)!.id;
-				} else {
-					activity.evicted = null;
-				}
+				countVotes(gameUtil, activity);
 
 				if (activity.evicted === gameUtil.getWolf()!.id) {
 					// If the village correctly guessed the wolf, finalise the game and broadcast it
@@ -400,22 +431,28 @@ export default defineEventHandler(
 				setResponseStatus(event, 400);
 				return response;
 			}
+			// Typescript and Sonar are at loggerheads as to whether id is set (it will be
+			// if we've passed validation) so add this check in to make both happy.
+			/* istanbul ignore next @preserve */
+			if (!id) {
+				throw new Error('No game code supplied');
+			}
 			const action = getRouterParam(event, 'action');
 			switch (action) {
 				case 'join': {
-					return await optimisticUpdate(id!, (game) => handleJoin(game));
+					return await optimisticUpdate(id, (game) => handleJoin(game));
 				}
 				case 'admit': {
-					return await optimisticUpdate(id!, (game) => handleAdmit(game));
+					return await optimisticUpdate(id, (game) => handleAdmit(game));
 				}
 				case 'start': {
-					return await optimisticUpdate(id!, (game) => handleStart(game));
+					return await optimisticUpdate(id, (game) => handleStart(game));
 				}
 				case 'night': {
-					return await optimisticUpdate(id!, (game) => handleNight(game));
+					return await optimisticUpdate(id, (game) => handleNight(game));
 				}
 				case 'day': {
-					return await optimisticUpdate(id!, (game) => handleDay(game));
+					return await optimisticUpdate(id, (game) => handleDay(game));
 				}
 				// case 'reset': {
 				// 	return await handleReset(game);

@@ -1,3 +1,4 @@
+import type { RuntimeConfig } from 'nuxt/schema';
 import type { H3Event, EventHandlerRequest } from 'h3';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import {
@@ -25,13 +26,13 @@ export const useDynamoDB = (event: H3Event<EventHandlerRequest>) => {
 };
 
 export const createDynamoDBWrapper = (
-	config: Record<string, string | unknown>
+	config: Record<string, string> | RuntimeConfig
 ): DynamoDBWrapper => {
 	const client = new DynamoDBClient({
-		region: config.AWS_REGION as string,
+		region: config.AWS_REGION,
 		credentials: {
-			accessKeyId: config.AWS_ACCESS_KEY_ID as string,
-			secretAccessKey: config.AWS_SECRET_ACCESS_KEY as string,
+			accessKeyId: config.AWS_ACCESS_KEY_ID,
+			secretAccessKey: config.AWS_SECRET_ACCESS_KEY,
 		},
 	});
 	const docClient = DynamoDBDocumentClient.from(client);
@@ -40,7 +41,7 @@ export const createDynamoDBWrapper = (
 		// Store a newly created game to the database
 		put: async (game: Game): Promise<void> => {
 			const put = new PutCommand({
-				TableName: config.AWS_DYNAMODB_TABLE as string,
+				TableName: config.AWS_DYNAMODB_TABLE,
 				Item: {
 					Id: game.id,
 					Created: new Date().toISOString(),
@@ -91,10 +92,10 @@ export const createDynamoDBWrapper = (
 				throw new Error('Cannot update a game without a version');
 			}
 			expression += ', Version = :next';
-			values[':next'] = game.version! + 1;
+			values[':next'] = game.version + 1;
 			values[':current'] = game.version!;
 			const update = new UpdateCommand({
-				TableName: config.AWS_DYNAMODB_TABLE as string,
+				TableName: config.AWS_DYNAMODB_TABLE,
 				Key: {
 					Id: game.id,
 				},
@@ -108,7 +109,7 @@ export const createDynamoDBWrapper = (
 		// Retrieve a game from the database
 		get: async (id: string): Promise<Nullable<Game>> => {
 			const get = new GetCommand({
-				TableName: config.AWS_DYNAMODB_TABLE as string,
+				TableName: config.AWS_DYNAMODB_TABLE,
 				Key: {
 					Id: id,
 				},

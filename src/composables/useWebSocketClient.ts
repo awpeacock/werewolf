@@ -36,27 +36,21 @@ export function useWebSocketClient() {
 	};
 
 	const handle = (event: GameEvent) => {
-		switch (event.type) {
-			case 'join-request': {
-				const request: JoinRequestEvent = event;
-				requests.value.push(request);
-				useLogger().info(`Join Request from "${request.player.nickname}" received`);
-				break;
-			}
+		if (event.type === 'join-request') {
+			const request: JoinRequestEvent = event;
+			requests.value.push(request);
+			useLogger().info(`Join Request from "${request.player.nickname}" received`);
 		}
 	};
 
 	const remove = (type: string, data: Player) => {
-		switch (type) {
-			case 'join-request': {
-				for (let r = 0; r < requests.value.length; r++) {
-					if (requests.value[r].player.id === (data as Player).id) {
-						requests.value.splice(r, 1);
-						useLogger().info(`Join Request from "${data.nickname}" removed from queue`);
-						break;
-					}
+		if (type === 'join-request') {
+			for (let r = 0; r < requests.value.length; r++) {
+				if (requests.value[r].player.id === data.id) {
+					requests.value.splice(r, 1);
+					useLogger().info(`Join Request from "${data.nickname}" removed from queue`);
+					break;
 				}
-				break;
 			}
 		}
 	};

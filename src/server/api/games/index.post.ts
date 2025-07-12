@@ -14,9 +14,10 @@ interface CreateRequest {
 export default defineEventHandler(
 	async (event: H3Event<EventHandlerRequest>): Promise<Game | APIErrorResponse> => {
 		const body: CreateRequest = await readBody(event);
+		const nickname = body.mayor ? body.mayor.trim() : null;
 
 		// Never trust only on client-side validation - let's do it all again
-		const errors: Array<APIError> = useValidation().validateNickname(body.mayor);
+		const errors: Array<APIError> = useValidation().validateNickname(nickname);
 		if (errors.length > 0) {
 			const response: APIErrorResponse = { errors: errors };
 			setResponseStatus(event, 400);
@@ -34,7 +35,7 @@ export default defineEventHandler(
 				id: id,
 				created: new Date(),
 				active: false,
-				players: [{ id: uuidv4(), nickname: body.mayor, roles: [Role.MAYOR] }],
+				players: [{ id: uuidv4(), nickname: nickname!, roles: [Role.MAYOR] }],
 			};
 
 			try {
